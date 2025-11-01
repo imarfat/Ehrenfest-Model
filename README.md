@@ -11,7 +11,7 @@ A desktop GUI application demonstrating the **Ehrenfest model of diffusion** usi
 
 Pictured below is the simulation window:
 
-<img width="528" height="320" alt="Ehrenfest GUI" src="https://github.com/user-attachments/assets/ae76df47-7bb5-4b12-a190-815fd0985b9e" />
+<img width="578" height="350" alt="Ehrenfest GUI" src="https://github.com/user-attachments/assets/ae76df47-7bb5-4b12-a190-815fd0985b9e" />
 
 ## Requirements
 
