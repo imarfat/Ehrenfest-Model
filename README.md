@@ -1,21 +1,36 @@
-Ehrenfest Model Simulation
+# Ehrenfest Model Simulation
 
-Run as a desktop GUI application (Tkinter + Matplotlib).
+A desktop GUI application demonstrating the **Ehrenfest model of diffusion** using **Tkinter** and **Matplotlib**.
 
-Requirements:
+## Features
+
+- **Left panel:** Ball distribution (Box A / Box B)  
+- **Top-right panel:** Simplified state diagram with transition probabilities  
+- **Bottom-right panel:** Real-time plot of X (balls in A) vs time  
+- **Controls:** Start, Pause, Reset, Timelapse, change number of balls (N) and simulation speed
+
+Pictured below is the simulation window:
+
+<img width="528" height="320" alt="Ehrenfest GUI" src="https://github.com/user-attachments/assets/ae76df47-7bb5-4b12-a190-815fd0985b9e" />
+
+## Requirements
+
 - Python 3.8+
 - matplotlib
 - numpy
 
-Install dependencies:
-    pip install -r requirements.txt
+## Installation
 
-Run:
-    python main.py
+Install dependencies using `pip`:
 
-This opens a window with three panels:
-- Left: Ball distribution (Box A / Box B)
-- Top-right: Simplified state diagram with transition probabilities
-- Bottom-right: Real-time plot of X (balls in A) vs time
+```bash
+pip install -r requirements.txt
+```
 
-Controls: Start, Pause, Reset, Timelapse, change N and speed.
+## Run
+
+Launch the simulation:
+
+```bash
+python main.py
+```
