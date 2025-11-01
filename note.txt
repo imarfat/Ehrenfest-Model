@@ -1,0 +1,5 @@
+May be good to add __init__.py into ehrenfest_app:
+
+from .main import main
+
+__all__ = ["main"]
