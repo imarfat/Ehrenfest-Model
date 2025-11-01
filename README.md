@@ -11,7 +11,7 @@ Install:
     pip install -r requirements.txt
 
 Run:
-    python ./main.py
+    python main.py
 
 This opens a window with three panels:
 - Left: Ball distribution (Box A / Box B)
