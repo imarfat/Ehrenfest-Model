@@ -122,4 +122,5 @@ class PlotPanel:
 
         self.ax.set_xlim(0, L)
         self.ax.set_ylim(0, max(1, self.N))
+        self.ax.yaxis.set_major_locator(MaxNLocator(integer=True))
         self.ax.figure.canvas.draw_idle()

@@ -132,6 +132,10 @@ class BallsPanel:
                 point_size = np.pi * (r * 140)**2
             else:
                 point_size = 1
+
+            edge_color = self.ball_outline_color if self.N < 5000 else 'none'
+            linewidth = 0.9 if self.N < 500 else 0
+
             if self.scatter is None:
                 self.scatter = self.ax.scatter(
                     positions[:, 0], positions[:, 1],

@@ -1,6 +1,6 @@
 import tkinter as tk
-from tkinter import ttk
 from tkinter import messagebox
+import customtkinter as ctk  # type: ignore
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg # type: ignore
 import matplotlib.pyplot as plt # type: ignore
 import numpy as np # type: ignore
@@ -12,7 +12,7 @@ from .plotPanel import PlotPanel
 import threading
 
 # Maximum allowed number of balls (for performance reasons)
-MAX_N = 10000
+MAX_N = 6000
 
 class EhrenfestApp:
     def __init__(self, root):
@@ -66,55 +66,93 @@ class EhrenfestApp:
         self.canvas.get_tk_widget().pack(fill=tk.BOTH, expand=1)
 
         # Controls frame
-        ctrl = ttk.Frame(root)
-        ctrl.pack(fill=tk.X, padx=6, pady=4)
+        ctrl = ctk.CTkFrame(root, corner_radius=10)
+        ctrl.pack(fill=tk.BOTH, padx=6, pady=4)
+
+        btn_frame = ctk.CTkFrame(ctrl, fg_color='transparent')
+        btn_frame.pack(side=tk.LEFT, padx=4, pady=4)
 
         # Buttons
-        self.start_btn = ttk.Button(ctrl, text='Start', command=self.start)
+        self.start_btn = ctk.CTkButton(btn_frame, text='▶ Start', command=self.start,
+                                       fg_color="#007bff", hover_color="#0056b3",
+                                       corner_radius=8, width=100, height=55)
         self.start_btn.pack(side=tk.LEFT, padx=4)
-        self.pause_btn = ttk.Button(ctrl, text='Pause', command=self.pause)
+        self.pause_btn = ctk.CTkButton(btn_frame, text='⏸ Pause', command=self.pause,
+                                       fg_color="#007bff", hover_color="#0056b3", 
+                                       corner_radius=8, width=100, height=55)
         self.pause_btn.pack(side=tk.LEFT, padx=4)
-        self.reset_btn = ttk.Button(ctrl, text='Reset', command=self.reset)
+        self.reset_btn = ctk.CTkButton(btn_frame, text='⟳ Reset', command=self.reset,
+                                       fg_color="#007bff", hover_color="#0056b3",
+                                       corner_radius=8, width=100, height=55)
         self.reset_btn.pack(side=tk.LEFT, padx=4)
 
-        # Spinbox for N
-        ttk.Label(ctrl, text='N:').pack(side=tk.LEFT, padx=(12,2))
-        self.n_var = tk.IntVar(value=self.model.N)
-        self.n_spin = tk.Spinbox(ctrl, from_=1, to=4000, textvariable=self.n_var, width=6, command=self.on_n_change)
-        self.n_spin.pack(side=tk.LEFT)
-        # Ensure typed values get validated when user finishes typing
-        try:
-            self.n_spin.bind('<FocusOut>', lambda e: self.on_n_change())
-            self.n_spin.bind('<Return>', lambda e: self.on_n_change())
-        except Exception:
-            pass
+        n_frame = ctk.CTkFrame(ctrl, fg_color='transparent')
+        n_frame.pack(side=tk.LEFT, padx=8, pady=4)
 
-        # Speed control slider
-        ttk.Label(ctrl, text='Speed (ms):').pack(side=tk.LEFT, padx=(12,2))
-        self.speed_var = tk.IntVar(value=self.speed_ms)
-        # Styling...
-        style = ttk.Style()
-        style.configure('Sleek.Horizontal.TScale', sliderlength=10)
+        ctk.CTkLabel(n_frame, text='Balls (N):', font=("Segoe UI", 11, "bold")).pack(padx=8, pady=(4,2))
 
-        self.speed_scale = ttk.Scale(ctrl, from_=10, to=2000, orient=tk.HORIZONTAL, length=220, command=self.on_speed_change, variable=self.speed_var, style='Sleek.Horizontal.TScale')
-        self.speed_scale.pack(side=tk.LEFT, padx=(0,6))
-        # Label to show current speed value
-        self.speed_value_label = ttk.Label(ctrl, text=f'{self.speed_ms} ms', width=8, anchor='w')
-        self.speed_value_label.pack(side=tk.LEFT)
+        n_controls = ctk.CTkFrame(n_frame, fg_color='transparent')
+        n_controls.pack(padx=8, pady=(2, 8))
 
-        # Status label
-        self.status = ttk.Label(ctrl, text='Iteration: 0    X = 0', anchor='e')
-        self.status.pack(side=tk.RIGHT, padx=(0, 6))
+        # Decrement button
+        n_down_btn = ctk.CTkButton(n_controls, text='−', command=lambda: self.adjust_n(-1),
+                           width=20, height=20, corner_radius=4, 
+                           fg_color="#333434", hover_color="#242525")
+        n_down_btn.pack(side=tk.LEFT, padx=2)
 
-        # Iterations for condensed run
-        self.timelapse_iters_var = tk.IntVar(value=1000)
-        self.condense_label = ttk.Label(ctrl, text='Timelapse iterations:')
-        self.condense_spin = tk.Spinbox(ctrl, from_=10, to=10000000, increment=10, textvariable=self.timelapse_iters_var, width=8)
-        self.timelapse_btn = ttk.Button(ctrl, text='Timelapse', command=self.on_timelapse)
+        self.n_var = tk.StringVar(value=str(self.model.N))
+        self.n_entry = ctk.CTkEntry(n_controls, textvariable=self.n_var, width=60, height=20,
+                             justify="center", corner_radius=6)
+        self.n_entry.pack(side=tk.LEFT, padx=2)
+        self.n_entry.bind('<FocusOut>', lambda e: self.on_n_change())
+        self.n_entry.bind('<Return>', lambda e: self.on_n_change())
 
-        self.timelapse_btn.pack(side=tk.RIGHT, padx=(0,6))
-        self.condense_spin.pack(side=tk.RIGHT, padx=(0,6))
-        self.condense_label.pack(side=tk.RIGHT, padx=(12,2))
+        # Increment button
+        n_up_btn = ctk.CTkButton(n_controls, text='+', command=lambda: self.adjust_n(1),
+                         width=20, height=20, corner_radius=4,
+                         fg_color="#333434", hover_color="#242525")
+        n_up_btn.pack(side=tk.LEFT, padx=2)
+
+        # Speed control frame
+        speed_frame = ctk.CTkFrame(ctrl, corner_radius=8, height=40)
+        speed_frame.pack(side=tk.LEFT, padx=8, pady=8, fill=tk.Y)
+        
+        speed_label_frame = ctk.CTkFrame(speed_frame, fg_color="transparent")
+        speed_label_frame.pack(padx=8)
+
+        ctk.CTkLabel(speed_label_frame, text="Speed", font=("Segoe UI", 11, "bold")).pack(side=tk.LEFT)
+        
+        self.speed_slider = ctk.CTkSlider(speed_frame, from_=1, to=2000, width=220,
+                                          command=self.on_speed_change, number_of_steps=1999)
+        self.speed_slider.set(self.speed_ms)
+        self.speed_slider.pack(padx=8, pady=(2, 8))
+
+         # Status label
+        self.status = ctk.CTkLabel(ctrl, text='Iteration: 0    X = 0', 
+                                   font=("Segoe UI", 12, "bold"))
+        self.status.pack(side=tk.RIGHT, padx=16, pady=8)
+
+        # Timelapse frame
+        timelapse_frame = ctk.CTkFrame(ctrl, corner_radius=8)
+        timelapse_frame.pack(side=tk.RIGHT, padx=16, pady=8)
+        
+        ctk.CTkLabel(timelapse_frame, text="Timelapse", font=("Segoe UI", 11, "bold")).pack(padx=8, pady=(4, 2))
+        
+        timelapse_controls = ctk.CTkFrame(timelapse_frame, fg_color="transparent")
+        timelapse_controls.pack(padx=8, pady=(2, 2))
+        
+        ctk.CTkLabel(timelapse_controls, text="Iterations:", font=("Segoe UI", 9)).pack(side=tk.LEFT, padx=(0, 4))
+        
+        self.timelapse_iters_var = tk.StringVar(value="1000")
+        self.timelapse_entry = ctk.CTkEntry(timelapse_controls, textvariable=self.timelapse_iters_var, 
+                                            width=100, justify="center", corner_radius=6)
+        self.timelapse_entry.pack(side=tk.LEFT, padx=4)
+        
+        self.timelapse_btn = ctk.CTkButton(timelapse_controls, text='🚀 Run', command=self.on_timelapse,
+                                           fg_color="#007bff", hover_color="#0056b3",
+                                           corner_radius=6, width=80, height=28)
+        self.timelapse_btn.pack(side=tk.LEFT, padx=4)
+    
 
         # Initial draw
         self.balls_panel.update(self.model.getState(), self.model.N)
@@ -137,11 +175,11 @@ class EhrenfestApp:
         self.state_diagram.update(self.model.getState(), self.model.N, probs=self.model.getTransitionProbabilities())
         self.plot_panel.update(self.model.getHistory(), self.model.N)
         self.canvas.draw_idle()
-        self.status['text'] = f'Iteration: {self.model.iteration}    X = {self.model.getState()}'
+        self.status.configure(text= f'Iteration: {self.model.iteration}    X = {self.model.getState()}')
 
     def on_n_change(self):
         try:
-            raw = self.n_spin.get()
+            raw = self.n_var.get()
             val = int(raw)
         except Exception:
             # If parsing fails just return without changing
@@ -177,11 +215,26 @@ class EhrenfestApp:
             self.status['text'] = f'Iteration: {self.model.iteration}    X = {getattr(self.model, "X", "?")}'
         except Exception:
             pass
+        
+    def adjust_n(self, delta):
+        try:
+            current = int(self.n_var.get())
+        except:
+            current = self.model.N
+    
+        new_val = current + delta
+        if new_val < 1:
+            new_val = 1
+        if new_val > MAX_N:
+            new_val = MAX_N
+    
+        self.n_var.set(str(new_val))
+        self.on_n_change()    
 
     def on_speed_change(self, val=None):
         # Scale passes the current value as a string arg
         try:
-            self.speed_ms = int(float(self.speed_var.get()))
+            self.speed_ms = int(float(self.speed_slider.get()))
         except Exception:
             # Fallback if value cannot be parsed
             return
@@ -202,7 +255,7 @@ class EhrenfestApp:
         self.balls_panel.update(X, self.model.N)
         self.state_diagram.update(X, self.model.N, probs=probs)
         self.plot_panel.update(self.model.getHistory(), self.model.N)
-        self.status['text'] = f'Iteration: {self.model.iteration}    X = {self.model.getState()}'
+        self.status.configure(text = f'Iteration: {self.model.iteration}    X = {self.model.getState()}')
         self.canvas.draw_idle()
         # Schedule next
         self.root.after(self.speed_ms, self._run_step)
@@ -217,10 +270,10 @@ class EhrenfestApp:
             return
 
         # Disable UI buttons while running
-        self.timelapse_btn.config(state=tk.DISABLED)
-        self.start_btn.config(state=tk.DISABLED)
-        self.pause_btn.config(state=tk.DISABLED)
-        self.reset_btn.config(state=tk.DISABLED)
+        self.timelapse_btn.configure(state=tk.DISABLED)
+        self.start_btn.configure(state=tk.DISABLED)
+        self.pause_btn.configure(state=tk.DISABLED)
+        self.reset_btn.configure(state=tk.DISABLED)
 
         # Background thread
         def worker():
@@ -253,10 +306,10 @@ class EhrenfestApp:
                 finally:
                     # re-enable buttons
                     try:
-                        self.timelapse_btn.config(state=tk.NORMAL)
-                        self.start_btn.config(state=tk.NORMAL)
-                        self.pause_btn.config(state=tk.NORMAL)
-                        self.reset_btn.config(state=tk.NORMAL)
+                        self.timelapse_btn.configure(state=tk.NORMAL)
+                        self.start_btn.configure(state=tk.NORMAL)
+                        self.pause_btn.configure(state=tk.NORMAL)
+                        self.reset_btn.configure(state=tk.NORMAL)
                     except Exception:
                         pass
             self.root.after(0, finish)
