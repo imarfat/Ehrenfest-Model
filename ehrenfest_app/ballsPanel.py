@@ -1,6 +1,7 @@
 import math
 from matplotlib.patches import Circle, Rectangle # type: ignore
 from matplotlib.collections import PatchCollection # type: ignore
+import numpy as np # type: ignore
 
 
 class BallsPanel:
@@ -16,6 +17,8 @@ class BallsPanel:
         self.box_edge_color = "#342110"
         self.ax.set_aspect('equal')
         self.ax.axis('off')
+        self.scatter = None
+        self.boxes_drawn = False
 
     def update(self, X, N=None):
         if N is not None:
@@ -32,32 +35,50 @@ class BallsPanel:
         return rows, cols
 
     def draw(self):
-        self.ax.clear()
-        self.ax.set_title('The Ehrenfest Model')
-        subtitle = r'A stochastic simulation of balls moving between two boxes.'
-        subsubtitle = r'$X_i$ ~ number of balls in Box A at iteration $i$'
-        try:
-            # main title / subtitle
-            self.ax.text(
-                0.5, 0.985, subtitle,
-                ha='center', va='top',
-                transform=self.ax.transAxes,
-                fontsize=9,
-                color='black'
-            )
-            # subsubtitle: smaller, muted, placed just below the subtitle
-            self.ax.text(
-                0.5, 0.94, subsubtitle,
-                ha='center', va='top',
-                transform=self.ax.transAxes,
-                fontsize=8,
-                color='#333333'
-            )
-        except Exception:
-            pass
+        if not self.boxes_drawn:
+            self.ax.clear()
+            self.ax.set_title('The Ehrenfest Model')
+            subtitle = r'A stochastic simulation of balls moving between two boxes.'
+            subsubtitle = r'$X_i$ ~ number of balls in Box A at iteration $i$'
+            try:
+                self.ax.text(
+                    0.5, 0.985, subtitle,
+                    ha='center', va='top',
+                    transform=self.ax.transAxes,
+                    fontsize=9,
+                    color='black'
+                )
+                self.ax.text(
+                    0.5, 0.94, subsubtitle,
+                    ha='center', va='top',
+                    transform=self.ax.transAxes,
+                    fontsize=8,
+                    color='#333333'
+                )
+            except Exception:
+                pass
 
     
-        self.ax.axis('off')
+            self.ax.axis('off')
+
+            left = 0.05
+            mid = 0.5
+            right = 0.95
+            bottom = 0.05
+            top = 0.85
+            box_w = mid - left - 0.02
+            box_h = top - bottom
+
+            rectA = Rectangle((left, bottom), box_w, box_h, fill=False, linewidth=1.8, edgecolor=self.box_edge_color)
+            rectB = Rectangle((mid + 0.02, bottom), box_w, box_h, fill=False, linewidth=1.8, edgecolor=self.box_edge_color)
+            self.ax.add_patch(rectA)
+            self.ax.add_patch(rectB)
+            self.ax.text(left + box_w/2, top + 0.01, 'Box A', ha='center', va='bottom', fontsize=6, color='black')
+            self.ax.text(mid + box_w/2 + 0.02, top + 0.01, 'Box B', ha='center', va='bottom', fontsize=6, color='black')
+        
+            self.ax.set_xlim(0, 1)
+            self.ax.set_ylim(0, 1)
+            self.boxes_drawn = True
 
         left = 0.05
         mid = 0.5
@@ -66,13 +87,6 @@ class BallsPanel:
         top = 0.85
         box_w = mid - left - 0.02
         box_h = top - bottom
-
-        rectA = Rectangle((left, bottom), box_w, box_h, fill=False, linewidth=1.8, edgecolor=self.box_edge_color)
-        rectB = Rectangle((mid + 0.02, bottom), box_w, box_h, fill=False, linewidth=1.8, edgecolor=self.box_edge_color)
-        self.ax.add_patch(rectA)
-        self.ax.add_patch(rectB)
-        self.ax.text(left + box_w/2, top + 0.01, 'Box A', ha='center', va='bottom', fontsize=6, color='black')
-        self.ax.text(mid + box_w/2 + 0.02, top + 0.01, 'Box B', ha='center', va='bottom', fontsize=6, color='black')
 
         counts = [self.X, self.N - self.X]
         boxes_x = [left + 0.01, mid + 0.03]
@@ -84,10 +98,10 @@ class BallsPanel:
             rows, cols = 1, 1
         cell_w = (box_w - 0.02) / cols
         cell_h = (box_h - 0.02) / rows
-        r = 0.35 * min(cell_w, cell_h)
+        r = 0.5 * min(cell_w, cell_h)
 
-        # Build Circle patches and add them as a single PatchCollection for better performance
-        patches = []
+        # Collect ball positions
+        positions = []
         for i, count in enumerate(counts):
             if count <= 0:
                 continue
@@ -99,17 +113,41 @@ class BallsPanel:
                     if placed >= count:
                         break
                     cx = bx + (col + 0.5) * cell_w
-                    # place rows starting at the bottom and building upward
                     cy = by + (row + 0.5) * cell_h
-                    patches.append(Circle((cx, cy), r))
+                    positions.append([cx, cy])
                     placed += 1
                 if placed >= count:
                     break
 
-        if patches:
-            coll = PatchCollection(patches, facecolor=self.ball_color, edgecolor=self.ball_outline_color, linewidths=0.9, zorder=2)
-            self.ax.add_collection(coll)
-
+        # Update or create scatter plot
+        if len(positions) > 0:
+            positions = np.array(positions)
+            if self.N <= 20:
+                point_size = np.pi * (r * 200)**2
+            elif self.N < 500:
+                point_size = np.pi * (r * 180)**2
+            elif self.N < 1700:
+                point_size = np.pi * (r * 160)**2
+            elif self.N < 6000:
+                point_size = np.pi * (r * 140)**2
+            else:
+                point_size = 1
+            if self.scatter is None:
+                self.scatter = self.ax.scatter(
+                    positions[:, 0], positions[:, 1],
+                    s=point_size,
+                    c=self.ball_color,
+                    edgecolors=self.ball_outline_color,
+                    linewidths=0.9,
+                    zorder=2
+                )
+            else:
+                # Just update positions - much faster!
+                self.scatter.set_offsets(positions)
+                self.scatter.set_sizes([point_size])
+        elif self.scatter is not None:
+            # No balls to show
+            self.scatter.set_offsets(np.empty((0, 2)))
         self.ax.set_xlim(0, 1)
         self.ax.set_ylim(0, 1)
         self.ax.figure.canvas.draw_idle()

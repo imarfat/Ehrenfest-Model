@@ -66,7 +66,7 @@ class StateDiagram:
             self.ax.annotate('', xy=(xs[0] + arrow_pad, ys), xytext=(xs[1] - arrow_pad, ys), arrowprops=arrow_props)
             # Draw probability label above the arrow at the midpoint
             mid = (xs[0] + xs[1]) / 2
-            self.ax.text(mid, ys + 0.04, f'{p_down:.2f}', ha='center', va='bottom', color=self.colors['text'], fontsize=9)
+            self.ax.text(mid + 0.01, ys + 0.04, f'{p_down:.2f}', ha='center', va='bottom', color=self.colors['text'], fontsize=9)
         
         if labels[1] is not None and labels[2] is not None:
             # Calculate probability of moving up a state
@@ -74,7 +74,7 @@ class StateDiagram:
             self.ax.annotate('', xy=(xs[2] - arrow_pad, ys), xytext=(xs[1] + arrow_pad, ys), arrowprops=arrow_props)
             # Draw probability label above the arrow at the midpoint
             mid = (xs[1] + xs[2]) / 2
-            self.ax.text(mid, ys + 0.04, f'{p_up:.2f}', ha='center', va='bottom', color=self.colors['text'], fontsize=9)
+            self.ax.text(mid - 0.01, ys + 0.04, f'{p_up:.2f}', ha='center', va='bottom', color=self.colors['text'], fontsize=9)
         
         self.ax.set_xlim(0, 1)
         self.ax.set_ylim(0, 1)

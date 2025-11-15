@@ -31,15 +31,13 @@ class PlotPanel:
         x = list(range(len(self.history)))
         y = self.history
         self.ax.plot(x, y, '-b', lw=1)
-        # highlight most recent point
+        # Highlight most recent point
         self.ax.plot(x[-1], y[-1], 'o', color='#fb923c')
-        # set integer axis limits and tickers so axes show whole numbers only
-        # anchor x-axis at 0 so timeline starts at zero
         xmin = 0
         xmax = x[-1] + 1
         self.ax.set_xlim(xmin, xmax)
         self.ax.set_ylim(0, max(1, self.N))
-        # choose an adaptive, friendly integer step for x ticks so gaps grow smoothly
+        # Adaptive integer step for x ticks so gaps grow smoothly
         x_range = max(1, int(xmax - xmin))
         target_ticks = 6
         raw_step = max(1, int(round(x_range / float(target_ticks))))

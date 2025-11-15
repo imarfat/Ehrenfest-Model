@@ -12,7 +12,7 @@ from .plotPanel import PlotPanel
 import threading
 
 # Maximum allowed number of balls (for performance reasons)
-MAX_N = 2000
+MAX_N = 10000
 
 class EhrenfestApp:
     def __init__(self, root):
