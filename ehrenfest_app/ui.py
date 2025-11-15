@@ -122,7 +122,7 @@ class EhrenfestApp:
 
         ctk.CTkLabel(speed_label_frame, text="Speed", font=("Segoe UI", 11, "bold")).pack(side=tk.LEFT)
         
-        self.speed_slider = ctk.CTkSlider(speed_frame, from_=1, to=2000, width=220,
+        self.speed_slider = ctk.CTkSlider(speed_frame, from_=2000, to=1, width=220,
                                           command=self.on_speed_change, number_of_steps=1999)
         self.speed_slider.set(self.speed_ms)
         self.speed_slider.pack(padx=8, pady=(2, 8))
