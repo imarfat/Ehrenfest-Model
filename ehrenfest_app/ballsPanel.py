@@ -35,6 +35,14 @@ class BallsPanel:
         return rows, cols
 
     def draw(self):
+        
+        left = 0.05
+        mid = 0.5
+        bottom = 0.05
+        top = 0.85
+        box_w = mid - left - 0.02
+        box_h = top - bottom
+        
         if not self.boxes_drawn:
             self.ax.clear()
             self.ax.set_title('The Ehrenfest Model')
@@ -61,14 +69,6 @@ class BallsPanel:
     
             self.ax.axis('off')
 
-            left = 0.05
-            mid = 0.5
-            right = 0.95
-            bottom = 0.05
-            top = 0.85
-            box_w = mid - left - 0.02
-            box_h = top - bottom
-
             rectA = Rectangle((left, bottom), box_w, box_h, fill=False, linewidth=1.8, edgecolor=self.box_edge_color)
             rectB = Rectangle((mid + 0.02, bottom), box_w, box_h, fill=False, linewidth=1.8, edgecolor=self.box_edge_color)
             self.ax.add_patch(rectA)
@@ -80,14 +80,6 @@ class BallsPanel:
             self.ax.set_ylim(0, 1)
             self.boxes_drawn = True
 
-        left = 0.05
-        mid = 0.5
-        right = 0.95
-        bottom = 0.05
-        top = 0.85
-        box_w = mid - left - 0.02
-        box_h = top - bottom
-
         counts = [self.X, self.N - self.X]
         boxes_x = [left + 0.01, mid + 0.03]
 
@@ -98,7 +90,7 @@ class BallsPanel:
             rows, cols = 1, 1
         cell_w = (box_w - 0.02) / cols
         cell_h = (box_h - 0.02) / rows
-        r = 0.5 * min(cell_w, cell_h)
+        r = 0.6 * min(cell_w, cell_h)
 
         # Collect ball positions
         positions = []
@@ -119,22 +111,22 @@ class BallsPanel:
                 if placed >= count:
                     break
 
-        # Update or create scatter plot
         if len(positions) > 0:
             positions = np.array(positions)
             if self.N <= 20:
+                point_size = np.pi * (r * 300)**2
+            elif self.N < 100:
+                point_size = np.pi * (r * 250)**2
+            elif self.N < 200:
                 point_size = np.pi * (r * 200)**2
             elif self.N < 500:
+                point_size = np.pi * (r * 190)**2
+            elif self.N < 1500:
                 point_size = np.pi * (r * 180)**2
-            elif self.N < 1700:
+            elif self.N < 3000:
                 point_size = np.pi * (r * 160)**2
-            elif self.N < 6000:
-                point_size = np.pi * (r * 140)**2
             else:
-                point_size = 1
-
-            edge_color = self.ball_outline_color if self.N < 5000 else 'none'
-            linewidth = 0.9 if self.N < 500 else 0
+                point_size = np.pi * (r * 140)**2
 
             if self.scatter is None:
                 self.scatter = self.ax.scatter(
