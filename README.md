@@ -1,6 +1,6 @@
 # Ehrenfest Model Simulation
 
-A desktop GUI application demonstrating the **Ehrenfest model of diffusion** using **Tkinter** and **Matplotlib**.
+A desktop GUI application demonstrating the **Ehrenfest model of diffusion** using **CustomTkinter** and **Matplotlib**.
 
 ## Features
 
@@ -11,13 +11,14 @@ A desktop GUI application demonstrating the **Ehrenfest model of diffusion** usi
 
 Pictured below is the simulation window:
 
-<img width="610" height="370" alt="Ehrenfest GUI" src="https://github.com/user-attachments/assets/ae76df47-7bb5-4b12-a190-815fd0985b9e" />
+<img width="610" height="370" alt="Ehrenfest GUI" src="https://github.com/user-attachments/assets/ee7948a8-39ea-453d-ab38-619e9d9dede2" />
 
 ## Requirements
 
 - Python 3.8+
 - matplotlib
 - numpy
+- CustomTkinter
 
 ## Installation
 
