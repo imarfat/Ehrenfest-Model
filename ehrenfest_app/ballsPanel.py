@@ -1,6 +1,5 @@
 import math
-from matplotlib.patches import Circle, Rectangle # type: ignore
-from matplotlib.collections import PatchCollection # type: ignore
+from matplotlib.patches import Rectangle # type: ignore
 import numpy as np # type: ignore
 
 
@@ -141,6 +140,7 @@ class BallsPanel:
                 # Just update positions - much faster!
                 self.scatter.set_offsets(positions)
                 self.scatter.set_sizes([point_size])
+                    
         elif self.scatter is not None:
             # No balls to show
             self.scatter.set_offsets(np.empty((0, 2)))

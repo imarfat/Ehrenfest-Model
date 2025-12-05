@@ -25,18 +25,24 @@ class PlotPanel:
         self.ax.set_xlabel('Iteration', labelpad=5)
         self.ax.set_ylabel(r'$X_i$ (balls in A)')
         self.ax.grid(True, linestyle='--', alpha=0.4)
+        
         if len(self.history) == 0:
             self.ax.figure.canvas.draw_idle()
             return
+        
+        self.ax.axhline(self.N / 2, color='r', alpha=0.8, linestyle='--', linewidth=0.5, label=f'Mean (N/2 = {self.N/2:.1f})')
+        
         x = list(range(len(self.history)))
         y = self.history
         self.ax.plot(x, y, '-b', lw=1)
+        
         # Highlight most recent point
         self.ax.plot(x[-1], y[-1], 'o', color='#fb923c')
         xmin = 0
         xmax = x[-1] + 1
         self.ax.set_xlim(xmin, xmax)
         self.ax.set_ylim(0, max(1, self.N))
+        
         # Adaptive integer step for x ticks so gaps grow smoothly
         x_range = max(1, int(xmax - xmin))
         target_ticks = 6
@@ -44,6 +50,7 @@ class PlotPanel:
         preferred_steps = [1, 2, 5, 10, 20, 25, 50, 100, 200, 500, 1000]
         step = next((s for s in preferred_steps if s >= raw_step), preferred_steps[-1])
         self.ax.xaxis.set_major_locator(MultipleLocator(step))
+        
         # y ticks remain integer-only
         self.ax.yaxis.set_major_locator(MaxNLocator(integer=True))
         self.ax.figure.canvas.draw_idle()
@@ -72,6 +79,8 @@ class PlotPanel:
         if L == 0:
             self.ax.figure.canvas.draw_idle()
             return
+        
+        self.ax.axhline(self.N / 2, color='r', alpha=0.8, linestyle='--', linewidth=0.5, label=f'Mean (N/2 = {self.N/2:.1f})')
 
         if L <= target_points:
             x = np.arange(L)

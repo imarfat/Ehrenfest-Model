@@ -21,7 +21,7 @@ class EhrenfestApp:
         self.root.title('Ehrenfest Model Simulation')
         self.running = False
         self.model = EhrenfestModel(N=20)
-        self.speed_ms = 200
+        self.speed_ms = 500
 
         self.fig = plt.Figure(figsize=(10, 6), dpi=100)
         
@@ -126,7 +126,7 @@ class EhrenfestApp:
         n_up_btn.pack(side=tk.LEFT, padx=2)
 
         # Speed control frame
-        speed_frame = ctk.CTkFrame(ctrl, corner_radius=8, height=40)
+        speed_frame = ctk.CTkFrame(ctrl, corner_radius=8, height=40, fg_color="transparent")
         speed_frame.pack(side=tk.LEFT, padx=8, pady=14, fill=tk.Y)
         
         speed_label_frame = ctk.CTkFrame(speed_frame, fg_color="transparent")
@@ -134,15 +134,16 @@ class EhrenfestApp:
 
         ctk.CTkLabel(speed_label_frame, text="Speed", font=("Segoe UI", 11, "bold")).pack(side=tk.LEFT)
         
-        self.speed_slider = ctk.CTkSlider(speed_frame, from_=2000, to=1, width=220,
+        self.speed_slider = ctk.CTkSlider(speed_frame, from_=1500, to=1, width=220,
                                           command=self.on_speed_change, number_of_steps=1999,
                                           button_color = "#333434", button_hover_color="#242525")
         self.speed_slider.set(self.speed_ms)
         self.speed_slider.pack(padx=8, pady=(2, 8))
 
         # Status label
-        self.status = ctk.CTkLabel(ctrl, text='Iteration: 0    X = 0', 
-                                   font=("Segoe UI", 12, "bold"))
+        self.status = ctk.CTkLabel(ctrl, text='Iteration: 0\nX = 0', 
+                                   font=("Segoe UI", 12, "bold"),
+                                   width=120, anchor="center")
         self.status.pack(side=tk.RIGHT, padx=16, pady=8)
 
         # Timelapse frame
@@ -264,7 +265,7 @@ class EhrenfestApp:
         self.state_diagram.update(self.model.getState(), self.model.N, probs=self.model.getTransitionProbabilities())
         self.plot_panel.update(self.model.getHistory(), self.model.N)
         self.canvas.draw_idle()
-        self.status.configure(text= f'Iteration: {self.model.iteration}    X = {self.model.getState()}')
+        self.status.configure(text= f'Iteration: {self.model.iteration}\nX = {self.model.getState()}')
 
     def on_n_change(self):
         try:
@@ -301,7 +302,7 @@ class EhrenfestApp:
         self.canvas.draw_idle()
         # Update status to show reset iteration
         try:
-            self.status['text'] = f'Iteration: {self.model.iteration}    X = {getattr(self.model, "X", "?")}'
+            self.status['text'] = f'Iteration: {self.model.iteration}\nX = {getattr(self.model, "X", "?")}'
         except Exception:
             pass
         
@@ -344,7 +345,7 @@ class EhrenfestApp:
         self.balls_panel.update(X, self.model.N)
         self.state_diagram.update(X, self.model.N, probs=probs)
         self.plot_panel.update(self.model.getHistory(), self.model.N)
-        self.status.configure(text = f'Iteration: {self.model.iteration}    X = {self.model.getState()}')
+        self.status.configure(text = f'Iteration: {self.model.iteration}\nX = {self.model.getState()}')
         self.canvas.draw_idle()
         # Schedule next
         self.root.after(self.speed_ms, self._run_step)
