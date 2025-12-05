@@ -22,7 +22,7 @@ class StateDiagram:
     def draw(self):
         self.ax.clear()
         self.ax.set_title('State Diagram / Markov Chain')
-        subtitle = r'Simplified 3-state view. Numbers represent the value of $X_i$.'
+        subtitle = 'Simplified 3-state view. The numbers inside \n of the ovals represent the value of $X_i$.'
         try:
             self.ax.text(0.5, 0.955, subtitle, ha='center', va='top', transform=self.ax.transAxes, fontsize=9, color=self.colors.get('text', 'black'))
         except Exception:
@@ -49,49 +49,46 @@ class StateDiagram:
                 labels.append(None)
             else:
                 labels.append(str(s))
+        
         # Draw states
         for i, lab in enumerate(labels):
             if lab is None:
                 continue
+            
             # Determine circle color
             face = self.colors['current'] if i == 1 else self.colors['neighbor']
-            # Draw circle and label
+            
             circ = mpatches.Circle((xs[i], ys), 0.08, facecolor=face, edgecolor='k')
-            # Add circle to axes
             self.ax.add_patch(circ)
-            # Add label
             self.ax.text(xs[i], ys, lab, ha='center', va='center', color=self.colors['text'], fontsize=10)
 
         if labels[0] is not None and labels[1] is not None:
+            mid = (xs[0] + xs[1]) / 2
             # Calculate probability of moving down a state
             p_down = float(self.X) / float(self.N) if self.N > 0 else 0.0
             self.ax.annotate('', xy=(xs[0] + arrow_pad, ys), xytext=(xs[1] - arrow_pad, ys), arrowprops=arrow_props)
             # Draw probability label above the arrow at the midpoint
-            mid = (xs[0] + xs[1]) / 2
             self.ax.text(mid + 0.01, ys + 0.04, f'{p_down:.2f}', ha='center', va='bottom', color=self.colors['text'], fontsize=9)
         
+            p_from_left = (self.N - (self.X - 1)) / self.N if self.N > 0 else 0.0
+            self.ax.annotate('', xy=(xs[1] - arrow_pad + 0.01, ys-0.04), xytext=(xs[0] + arrow_pad, ys-0.04), arrowprops=curve_right_props)
+            # Draw probability label below the curved arrow
+            self.ax.text(mid, ys - 0.18, f'{p_from_left:.2f}', ha='center', va='top', color=self.colors['text'], fontsize=9)
+            
         if labels[1] is not None and labels[2] is not None:
+            mid = (xs[1] + xs[2]) / 2
             # Calculate probability of moving up a state
             p_up = float(self.N - self.X) / float(self.N) if self.N > 0 else 0.0
             self.ax.annotate('', xy=(xs[2] - arrow_pad, ys), xytext=(xs[1] + arrow_pad, ys), arrowprops=arrow_props)
             # Draw probability label above the arrow at the midpoint
-            mid = (xs[1] + xs[2]) / 2
             self.ax.text(mid - 0.01, ys + 0.04, f'{p_up:.2f}', ha='center', va='bottom', color=self.colors['text'], fontsize=9)
-        if labels[0] is not None and labels[1] is not None:
-            # Probability of moving from (X-1) -> X
-            p_from_left = (self.N - (self.X - 1)) / self.N if self.N > 0 else 0.0
-            self.ax.annotate('', xy=(xs[1] - arrow_pad, ys-0.04), xytext=(xs[0] + arrow_pad, ys-0.04), arrowprops=curve_right_props)
-            # Draw probability label below the curved arrow
-            mid = (xs[0] + xs[1]) / 2
-            self.ax.text(mid, ys - 0.18, f'{p_from_left:.2f}', ha='center', va='top', color=self.colors['text'], fontsize=9)
-
-        if labels[2] is not None and labels[1] is not None:
-            # Probability of moving from (X+1) -> X
+            
             p_from_right = (self.X + 1) / self.N if self.N > 0 else 0.0
-            self.ax.annotate('', xy=(xs[1] + arrow_pad, ys-0.04), xytext=(xs[2] - arrow_pad, ys-0.04), arrowprops=curve_left_props)
+            self.ax.annotate('', xy=(xs[1] + arrow_pad - 0.01, ys-0.04), xytext=(xs[2] - arrow_pad, ys-0.04), arrowprops=curve_left_props)
             # Draw probability label below the curved arrow
             mid = (xs[1] + xs[2]) / 2
             self.ax.text(mid, ys - 0.18, f'{p_from_right:.2f}', ha='center', va='top', color=self.colors['text'], fontsize=9)
+        
         self.ax.set_xlim(0, 1)
         self.ax.set_ylim(0, 1)
         self.ax.figure.canvas.draw_idle()

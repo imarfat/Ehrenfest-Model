@@ -53,6 +53,7 @@ class PlotPanel:
         
         # y ticks remain integer-only
         self.ax.yaxis.set_major_locator(MaxNLocator(integer=True))
+        self.ax.legend(fontsize=7) 
         self.ax.figure.canvas.draw_idle()
 
     
@@ -92,6 +93,7 @@ class PlotPanel:
             self.ax.set_ylim(0, max(1, self.N))
             self.ax.xaxis.set_major_locator(MaxNLocator(integer=True))
             self.ax.yaxis.set_major_locator(MaxNLocator(integer=True))
+            self.ax.legend(fontsize=7) 
             self.ax.figure.canvas.draw_idle()
             return
 
@@ -132,4 +134,5 @@ class PlotPanel:
         self.ax.set_xlim(0, L)
         self.ax.set_ylim(0, max(1, self.N))
         self.ax.yaxis.set_major_locator(MaxNLocator(integer=True))
+        self.ax.legend(fontsize=7)
         self.ax.figure.canvas.draw_idle()
