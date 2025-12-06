@@ -138,8 +138,8 @@ class StateDiagram:
         if has_left and self.N > 0:
             p_down = float(self.X) / float(self.N)
             p_from_left = (self.N - (self.X - 1)) / self.N
-            self.prob_text_left_above.set_text(f'{p_down:.2f}')
-            self.prob_text_left_below.set_text(f'{p_from_left:.2f}')
+            self.prob_text_left_above.set_text(self._format_prob(p_down))
+            self.prob_text_left_below.set_text(self._format_prob(p_from_left))
 
         self.arrow_center_to_right.set_visible(has_right)
         self.arrow_right_to_center.set_visible(has_right)
@@ -149,5 +149,9 @@ class StateDiagram:
         if has_right and self.N > 0:
             p_up = float(self.N - self.X) / float(self.N)
             p_from_right = (self.X + 1) / self.N
-            self.prob_text_right_above.set_text(f'{p_up:.2f}')
-            self.prob_text_right_below.set_text(f'{p_from_right:.2f}')
+            self.prob_text_right_above.set_text(self._format_prob(p_up))
+            self.prob_text_right_below.set_text(self._format_prob(p_from_right))
+
+    def _format_prob(self, value):
+        places = 3 if self.N >= 1000 else 2
+        return f'{value:.{places}f}'

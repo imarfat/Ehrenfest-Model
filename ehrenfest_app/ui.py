@@ -33,7 +33,14 @@ class EhrenfestApp:
             noise = (noise - noise.min()) / (noise.max() - noise.min())
             noise = 0.9 + 0.06 * (noise - 0.5)
             ax_bg = self.fig.add_axes([0, 0, 1, 1], zorder=0)
-            ax_bg.imshow(noise, cmap='Greys', aspect='auto', interpolation='bilinear', extent=[0, 1, 0, 1], alpha=0.1)
+            ax_bg.imshow(
+                noise, 
+                cmap='Greys', 
+                aspect='auto', 
+                interpolation='bilinear', 
+                extent=[0, 1, 0, 1], 
+                alpha=0.1
+            )
             ax_bg.set_axis_off()
         except Exception:
             # Continue with plain background if error occurs
@@ -100,30 +107,59 @@ class EhrenfestApp:
         n_frame = ctk.CTkFrame(ctrl, fg_color='transparent')
         n_frame.pack(side=tk.LEFT, padx=8, pady=4)
 
-        ctk.CTkLabel(n_frame, text='Balls (N):', font=("Segoe UI", 11, "bold")).pack(padx=8, pady=(4,2))
+        ctk.CTkLabel(
+            n_frame, 
+            text='Balls (N):', 
+            font=("Segoe UI", 11, "bold")
+        ).pack(padx=8, pady=(8,0))
 
         n_controls = ctk.CTkFrame(n_frame, fg_color='transparent')
-        n_controls.pack(padx=8, pady=(2, 8))
+        n_controls.pack(padx=8, pady=(0, 8))
 
         # Decrement button
-        n_down_btn = ctk.CTkButton(n_controls, text='−', command=lambda: self.adjust_n(-1),
-                           width=20, height=20, corner_radius=4, 
-                           fg_color="#333434", hover_color="#242525")
-        n_down_btn.pack(side=tk.LEFT, padx=2)
+        n_down_btn = ctk.CTkButton(
+            n_controls,
+            text='−',
+            command=lambda: self.adjust_n(-1),
+            width=24,
+            height=24,
+            corner_radius=12,
+            fg_color="transparent",
+            hover_color="#e5e7eb",
+            text_color="#111111",
+            border_width=0
+        )
+        n_down_btn.pack(side=tk.LEFT)
 
         # N entry box
         self.n_var = tk.StringVar(value=str(self.model.N))
-        self.n_entry = ctk.CTkEntry(n_controls, textvariable=self.n_var, width=60, height=20,
-                             justify="center", corner_radius=6)
+        self.n_entry = ctk.CTkEntry(
+            n_controls, 
+            textvariable=self.n_var, 
+            width=60, 
+            height=20,
+            justify="center", 
+            corner_radius=6
+        )
         self.n_entry.pack(side=tk.LEFT, padx=2)
         self.n_entry.bind('<FocusOut>', lambda e: self.on_n_change())
         self.n_entry.bind('<Return>', lambda e: self.on_n_change())
+        self.n_entry.bind('<MouseWheel>', self._on_n_mousewheel)
 
         # Increment button
-        n_up_btn = ctk.CTkButton(n_controls, text='+', command=lambda: self.adjust_n(1),
-                         width=20, height=20, corner_radius=4,
-                         fg_color="#333434", hover_color="#242525")
-        n_up_btn.pack(side=tk.LEFT, padx=2)
+        n_up_btn = ctk.CTkButton(
+            n_controls,
+            text='+',
+            command=lambda: self.adjust_n(1),
+            width=24,
+            height=24,
+            corner_radius=12,
+            fg_color="transparent",
+            hover_color="#e5e7eb",
+            text_color="#111111",
+            border_width=0
+        )
+        n_up_btn.pack(side=tk.LEFT)
 
         # Speed control frame
         speed_frame = ctk.CTkFrame(ctrl, corner_radius=8, height=40, fg_color="transparent")
@@ -132,34 +168,61 @@ class EhrenfestApp:
         speed_label_frame = ctk.CTkFrame(speed_frame, fg_color="transparent")
         speed_label_frame.pack(padx=8)
 
-        ctk.CTkLabel(speed_label_frame, text="Speed", font=("Segoe UI", 11, "bold")).pack(side=tk.LEFT)
+        ctk.CTkLabel(
+            speed_label_frame, 
+            text="Speed", 
+            font=("Segoe UI", 11, "bold")
+        ).pack(side=tk.LEFT)
         
-        self.speed_slider = ctk.CTkSlider(speed_frame, from_=1500, to=1, width=220,
-                                          command=self.on_speed_change, number_of_steps=1999,
-                                          button_color = "#333434", button_hover_color="#242525")
+        self.speed_slider = ctk.CTkSlider(
+            speed_frame, 
+            from_=1000, 
+            to=1, 
+            width=220,
+            command=self.on_speed_change, 
+            number_of_steps=1999,
+            button_color = "#333434", 
+            button_hover_color="#242525"
+        )
         self.speed_slider.set(self.speed_ms)
         self.speed_slider.pack(padx=8, pady=(2, 8))
 
         # Status label
-        self.status = ctk.CTkLabel(ctrl, text='Iteration: 0\nX = 0', 
-                                   font=("Segoe UI", 12, "bold"),
-                                   width=120, anchor="center")
+        self.status = ctk.CTkLabel(
+            ctrl, 
+            text="Iteration: 0\nX = 0", 
+            font=("Segoe UI", 12, "bold"),
+            width=120, anchor="center"
+        )
         self.status.pack(side=tk.RIGHT, padx=16, pady=8)
 
         # Timelapse frame
         timelapse_frame = ctk.CTkFrame(ctrl, corner_radius=8)
         timelapse_frame.pack(side=tk.RIGHT, padx=16, pady=8)
         
-        ctk.CTkLabel(timelapse_frame, text="Timelapse", font=("Segoe UI", 11, "bold")).pack(padx=8, pady=(4, 2))
+        ctk.CTkLabel(
+            timelapse_frame, 
+            text="Timelapse", 
+            font=("Segoe UI", 11, "bold")
+        ).pack(padx=8, pady=(4, 2))
         
         timelapse_controls = ctk.CTkFrame(timelapse_frame, fg_color="transparent")
         timelapse_controls.pack(padx=8, pady=(2, 2))
         
-        ctk.CTkLabel(timelapse_controls, text="Iterations:", font=("Segoe UI", 9)).pack(side=tk.LEFT, padx=(0, 4))
+        ctk.CTkLabel(
+            timelapse_controls, 
+            text="Iterations:", 
+            font=("Segoe UI", 9)
+        ).pack(side=tk.LEFT, padx=(0, 4))
         
         self.timelapse_iters_var = tk.StringVar(value="1000")
-        self.timelapse_entry = ctk.CTkEntry(timelapse_controls, textvariable=self.timelapse_iters_var, 
-                                            width=100, justify="center", corner_radius=6)
+        self.timelapse_entry = ctk.CTkEntry(
+            timelapse_controls, 
+            textvariable=self.timelapse_iters_var, 
+            width=100, 
+            justify="center", 
+            corner_radius=6
+        )
         self.timelapse_entry.pack(side=tk.LEFT, padx=4)
         
         # Timelapse run button
@@ -177,6 +240,13 @@ class EhrenfestApp:
         self.state_diagram.update(self.model.getState(), self.model.N, probs=self.model.getTransitionProbabilities())
         self.plot_panel.update(self.model.getHistory(), self.model.N)
         self.canvas.draw_idle()
+    
+    def _on_n_mousewheel(self, event):
+        if event.delta > 0:
+            self.adjust_n(1) 
+        elif event.delta < 0:
+            self.adjust_n(-1) 
+        return "break"         
         
     def _apply_hover_animation(self, widget, color_start, color_end):
         def hex_to_rgb(h):
