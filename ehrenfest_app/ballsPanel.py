@@ -53,6 +53,7 @@ class BallsPanel:
             self.cancel_animation()
             
         self._update_box_top_visibility()
+        self._update_box_labels_position()
         self.force_redraw()
 
     def set_animation_complete_callback(self, callback):
@@ -96,6 +97,7 @@ class BallsPanel:
         self.animation_allowed = self.user_animation_enabled and self.N <= 200
         self._update_box_bounds()
         self._update_box_top_visibility()
+        self._update_box_labels_position()
 
         positions = self._draw_and_collect_positions()
         self.current_positions = positions
@@ -154,6 +156,7 @@ class BallsPanel:
             self.ax.set_ylim(0, 1)
             self.boxes_drawn = True
             self._update_box_top_visibility()
+            self._update_box_labels_position()
 
         counts = [self.X, self.N - self.X]
         boxes_x = [left + 0.01, mid + 0.03]
@@ -242,15 +245,41 @@ class BallsPanel:
             top_line = edges.get('top')
             if top_line is not None:
                 top_line.set_visible(visible)
-                
+        
         for label in self.box_labels.values():
             if label is not None:
-                label.set_visible(visible)
-                
+                label.set_visible(True)
+        
         self.ax.figure.canvas.draw_idle()
 
+    def _update_box_labels_position(self):
+        # Position labels above boxes when not animating, below when animating
+        for key, label in self.box_labels.items():
+            if label is None:
+                continue
+            edges = self.box_edges.get(key, {})
+            bottom_line = edges.get('bottom')
+            top_line = edges.get('top')
+            if bottom_line is None or top_line is None:
+                continue
+            x0 = bottom_line.get_xdata()[0]
+            x1 = bottom_line.get_xdata()[1]
+            y0 = bottom_line.get_ydata()[0]
+            ytop = top_line.get_ydata()[0]
+            w = x1 - x0
+            cx = x0 + w / 2.0
+            if self.animation_allowed:
+                # Place below box
+                label.set_position((cx, y0 - 0.02))
+                label.set_verticalalignment('top')
+            else:
+                # Place above box
+                label.set_position((cx, ytop + 0.01))
+                label.set_verticalalignment('bottom')
+            label.set_visible(True)
+
     def force_redraw(self):
-        # Rebuild static geometry to reflect new bounds.
+        # Rebuild static geometry to reflect new bounds
         self.boxes_drawn = False
         positions = self._draw_and_collect_positions()
         self.current_positions = positions
