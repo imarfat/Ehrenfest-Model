@@ -35,3 +35,7 @@ Launch the simulation:
 ```bash
 python main.py
 ```
+
+## Wiki
+
+Full guide, concepts, and module docs live in the [GitHub Wiki](../../wiki).
