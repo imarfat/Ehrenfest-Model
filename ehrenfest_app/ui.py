@@ -22,6 +22,7 @@ class EhrenfestApp:
         self.running = False
         self.model = EhrenfestModel(N=20)
         self.speed_ms = 500
+        self._waiting_for_animation = False
         self._animated_widgets = []
 
         self.fig = plt.Figure(figsize=(10, 6), dpi=100)
@@ -65,13 +66,28 @@ class EhrenfestApp:
         self.ax_plot.set_position([pos.x0, new_y0, pos.width, pos.height])
 
         # Panels
-        self.balls_panel = BallsPanel(self.ax_balls, N=self.model.N)
+        self.balls_panel = BallsPanel(self.ax_balls, N=self.model.N, scheduler=self.root)
+        self.balls_panel.set_animation_complete_callback(self._on_ball_animation_complete)
         self.state_diagram = StateDiagram(self.ax_state, N=self.model.N)
         self.plot_panel = PlotPanel(self.ax_plot, N=self.model.N)
 
         # Canvas
         self.canvas = FigureCanvasTkAgg(self.fig, master=root)
         self.canvas.get_tk_widget().pack(fill=tk.BOTH, expand=1)
+
+        # Animation controls below the visualization
+        anim_ctrl = ctk.CTkFrame(root, fg_color='transparent')
+        anim_ctrl.pack(fill=tk.X, padx=10, pady=(4, 0))
+        self.anim_var = tk.BooleanVar(value=False)
+        self.anim_switch = ctk.CTkSwitch(
+            anim_ctrl,
+            text="Animate ball transfers (N ≤ 200)",
+            variable=self.anim_var,
+            command=self._on_animation_toggle,
+            progress_color="#1f4d7a",
+        )
+        self.anim_switch.pack(side=tk.LEFT, padx=4, pady=4)
+        self._refresh_animation_toggle_state()
 
         # Controls frame
         ctrl = ctk.CTkFrame(root, corner_radius=10)
@@ -105,8 +121,11 @@ class EhrenfestApp:
 
         # Controls button
         self.advanced_visible = False
+        adv_wrapper = ctk.CTkFrame(btn_frame, fg_color='transparent', width=40, height=50)
+        adv_wrapper.pack_propagate(False)
+        adv_wrapper.pack(side=tk.LEFT, padx=4)
         self.advanced_btn = ctk.CTkButton(
-            btn_frame,
+            adv_wrapper,
             text='〉',
             text_color="black",
             command=self.toggle_advanced_controls,
@@ -118,7 +137,7 @@ class EhrenfestApp:
             font=("Segoe UI", 26, "bold"),
             hover=False,
         )
-        self.advanced_btn.pack(side=tk.LEFT, padx=4)
+        self.advanced_btn.place(relx=0.5, rely=0.0, y=-2, anchor='n')
 
         # N control frame (initially hidden)
         self.n_frame = ctk.CTkFrame(ctrl, fg_color='transparent')
@@ -177,7 +196,7 @@ class EhrenfestApp:
         )
         n_up_btn.pack(side=tk.LEFT)
 
-        # Speed control frame (initially hidden; shown via settings button)
+        # Speed control frame (initially hidden)
         self.speed_frame = ctk.CTkFrame(ctrl, corner_radius=8, height=40, fg_color="transparent")
         
         speed_label_frame = ctk.CTkFrame(self.speed_frame, fg_color="transparent")
@@ -185,7 +204,7 @@ class EhrenfestApp:
 
         ctk.CTkLabel(
             speed_label_frame, 
-            text="Speed", 
+            text="Speed (non-animated)", 
             font=("Segoe UI", 11, "bold")
         ).pack(side=tk.LEFT)
         
@@ -281,7 +300,6 @@ class EhrenfestApp:
         step_size = 1.0 / steps
         delay = 10 # ms
         
-        # Initialize animation state on the widget
         if not hasattr(widget, '_anim_current'):
             widget._anim_current = 0.0 
         if not hasattr(widget, '_anim_target'):
@@ -384,6 +402,43 @@ class EhrenfestApp:
             widget._anim_running = False
             self._apply_hover_colors(widget)
 
+    def _refresh_animation_toggle_state(self):
+        if not hasattr(self, 'anim_switch'):
+            return
+        if self.model.N > 200:
+            was_on = self.anim_var.get()
+            try:
+                self.anim_switch.configure(state=tk.DISABLED)
+            except Exception:
+                pass
+            if self.anim_var.get():
+                self.anim_var.set(False)
+            self.balls_panel.set_animation_enabled(False)
+            if was_on:
+                self._resume_after_cancelled_animation()
+            return
+        else:
+            try:
+                self.anim_switch.configure(state=tk.NORMAL)
+            except Exception:
+                pass
+        self.balls_panel.set_animation_enabled(bool(self.anim_var.get()))
+
+    def _on_animation_toggle(self):
+        self.balls_panel.set_animation_enabled(bool(self.anim_var.get()))
+        if not self.anim_var.get():
+            self._resume_after_cancelled_animation()
+
+    def _on_ball_animation_complete(self):
+        self._waiting_for_animation = False
+        if self.running:
+            self.root.after(self.speed_ms, self._run_step)
+
+    def _resume_after_cancelled_animation(self):
+        if self._waiting_for_animation and self.running:
+            self._waiting_for_animation = False
+            self.root.after(self.speed_ms, self._run_step)
+
     def _show_advanced_controls(self):
         """Pack and show the N controls and speed slider."""
         if self.advanced_visible:
@@ -427,14 +482,18 @@ class EhrenfestApp:
         if not self.running:
             self.running = True
             self._set_hover_animation_enabled(False)
+            self._waiting_for_animation = False
             self._run_step()
 
     def pause(self):
         if self.running:
             self.running = False
             self._set_hover_animation_enabled(True)
+            self._waiting_for_animation = False
 
     def reset(self):
+        self.balls_panel.cancel_animation()
+        self._resume_after_cancelled_animation()
         val = self._read_and_clamp_n()
         if val is None:
             return
@@ -445,6 +504,7 @@ class EhrenfestApp:
         self.plot_panel.update(self.model.getHistory(), self.model.N)
         self.canvas.draw_idle()
         self.status.configure(text= f'Iteration: {self.model.iteration}\nX = {self.model.getState()}')
+        self._refresh_animation_toggle_state()
 
     def _read_and_clamp_n(self, show_warning=True):
         """Parse the N entry, clamp to [1, MAX_N], update the UI, and return the int."""
@@ -472,11 +532,12 @@ class EhrenfestApp:
         return val
 
     def on_n_change(self):
+        self.balls_panel.cancel_animation()
+        self._resume_after_cancelled_animation()
         val = self._read_and_clamp_n()
         if val is None:
-            # If parsing fails just return without changing
             return
-        # Change N and reset iteration counter
+        
         self.model.setN(val)
         self.model.iteration = 0
         
@@ -491,6 +552,7 @@ class EhrenfestApp:
             self.status['text'] = f'Iteration: {self.model.iteration}\nX = {getattr(self.model, "X", "?")}'
         except Exception:
             pass
+        self._refresh_animation_toggle_state()
         
     def adjust_n(self, delta):
         try:
@@ -513,11 +575,6 @@ class EhrenfestApp:
             self.speed_ms = int(float(self.speed_slider.get()))
         except Exception:
             return
-        
-        try:
-            self.speed_value_label['text'] = f'{self.speed_ms} ms'
-        except Exception:
-            pass
 
     def _run_step(self):
         """Performs one simulation step and schedules the next if running"""
@@ -527,14 +584,18 @@ class EhrenfestApp:
 
         X, probs = self.model.step()
         
-        self.balls_panel.update(X, self.model.N)
+        animation_active = self.balls_panel.update(X, self.model.N)
         self.state_diagram.update(X, self.model.N, probs=probs)
         self.plot_panel.update(self.model.getHistory(), self.model.N)
         self.status.configure(text = f'Iteration: {self.model.iteration}\nX = {self.model.getState()}')
         self.canvas.draw_idle()
         
         # Schedule next
-        self.root.after(self.speed_ms, self._run_step)
+        if animation_active:
+            self._waiting_for_animation = True
+        else:
+            self._waiting_for_animation = False
+            self.root.after(self.speed_ms, self._run_step)
 
     def on_timelapse(self):
         """Starts a "timelapsed" run in a background thread, collecting history and then plotting it."""
