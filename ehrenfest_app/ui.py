@@ -103,17 +103,33 @@ class EhrenfestApp:
         self.reset_btn.pack(side=tk.LEFT, padx=4)
         self._apply_hover_animation(self.reset_btn, "#FFFFFF", "#A3A3A3")
 
-        # N control frame
-        n_frame = ctk.CTkFrame(ctrl, fg_color='transparent')
-        n_frame.pack(side=tk.LEFT, padx=8, pady=4)
+        # Controls button
+        self.advanced_visible = False
+        self.advanced_btn = ctk.CTkButton(
+            btn_frame,
+            text='〉',
+            text_color="black",
+            command=self.toggle_advanced_controls,
+            fg_color="transparent",
+            border_width=0,
+            corner_radius=6,
+            width=40,
+            height=50,
+            font=("Segoe UI", 26, "bold"),
+            hover=False,
+        )
+        self.advanced_btn.pack(side=tk.LEFT, padx=4)
+
+        # N control frame (initially hidden)
+        self.n_frame = ctk.CTkFrame(ctrl, fg_color='transparent')
 
         ctk.CTkLabel(
-            n_frame, 
+            self.n_frame, 
             text='Balls (N):', 
             font=("Segoe UI", 11, "bold")
         ).pack(padx=8, pady=(8,0))
 
-        n_controls = ctk.CTkFrame(n_frame, fg_color='transparent')
+        n_controls = ctk.CTkFrame(self.n_frame, fg_color='transparent')
         n_controls.pack(padx=8, pady=(0, 8))
 
         # Decrement button
@@ -161,11 +177,10 @@ class EhrenfestApp:
         )
         n_up_btn.pack(side=tk.LEFT)
 
-        # Speed control frame
-        speed_frame = ctk.CTkFrame(ctrl, corner_radius=8, height=40, fg_color="transparent")
-        speed_frame.pack(side=tk.LEFT, padx=8, pady=14, fill=tk.Y)
+        # Speed control frame (initially hidden; shown via settings button)
+        self.speed_frame = ctk.CTkFrame(ctrl, corner_radius=8, height=40, fg_color="transparent")
         
-        speed_label_frame = ctk.CTkFrame(speed_frame, fg_color="transparent")
+        speed_label_frame = ctk.CTkFrame(self.speed_frame, fg_color="transparent")
         speed_label_frame.pack(padx=8)
 
         ctk.CTkLabel(
@@ -175,7 +190,7 @@ class EhrenfestApp:
         ).pack(side=tk.LEFT)
         
         self.speed_slider = ctk.CTkSlider(
-            speed_frame, 
+            self.speed_frame, 
             from_=1000, 
             to=1, 
             width=220,
@@ -368,6 +383,45 @@ class EhrenfestApp:
             widget._anim_current = 0.0
             widget._anim_running = False
             self._apply_hover_colors(widget)
+
+    def _show_advanced_controls(self):
+        """Pack and show the N controls and speed slider."""
+        if self.advanced_visible:
+            return
+        try:
+            self.n_frame.pack(side=tk.LEFT, padx=8, pady=4)
+            self.speed_frame.pack(side=tk.LEFT, padx=8, pady=14, fill=tk.Y)
+        except Exception:
+            pass
+        self.advanced_visible = True
+        # Indicate open state with a left angle bracket, but keep styling minimal
+        try:
+            self.advanced_btn.configure(text='〈')
+        except Exception:
+            pass
+
+    def _hide_advanced_controls(self):
+        """Hide the N controls and speed slider."""
+        if not self.advanced_visible:
+            return
+        try:
+            self.n_frame.pack_forget()
+            self.speed_frame.pack_forget()
+        except Exception:
+            pass
+        self.advanced_visible = False
+        
+        try:
+            self.advanced_btn.configure(text='〉')
+        except Exception:
+            pass
+
+    def toggle_advanced_controls(self):
+        """Toggle visibility of advanced controls (N and speed)."""
+        if self.advanced_visible:
+            self._hide_advanced_controls()
+        else:
+            self._show_advanced_controls()
 
     def start(self):
         if not self.running:
