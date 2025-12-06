@@ -1,138 +1,179 @@
-import matplotlib.pyplot as plt # type: ignore
-from matplotlib.ticker import MaxNLocator, MultipleLocator # type: ignore
+import math
 import numpy as np # type: ignore
+from matplotlib.collections import PolyCollection # type: ignore
+from matplotlib.ticker import FuncFormatter, MaxNLocator, MultipleLocator # type: ignore
+
 
 class PlotPanel:
     def __init__(self, ax, N=20):
         self.ax = ax
         self.N = N
         self.history = []
-        self.line = None
-        self.ax.set_title(r'Trajectory of $X_i$')
-        self.ax.set_xlabel('Iteration')
+        self.mode = 'realtime'
+        self.ax.set_title(r'Real Time Trajectory of $X_i$', pad=12)
+        self.ax.set_xlabel('Iteration', labelpad=5)
         self.ax.set_ylabel(r'$X_i$ (balls in A)')
         self.ax.grid(True, linestyle='--', alpha=0.4)
+
+        self.mean_line = self.ax.axhline(
+            self.N / 2, color='r', alpha=0.8,
+            linestyle='--', linewidth=0.5,
+            label=self._mean_label()
+        )
+        (self.history_line,) = self.ax.plot([], [], '-b', lw=1, label='Trajectory')
+        (self.last_point,) = self.ax.plot([], [], 'o', color='#fb923c', label='Current value')
+
+        (self.condensed_line,) = self.ax.plot([], [], '-b', lw=1, visible=False)
+        self.condensed_fill = PolyCollection([], facecolor='C0', alpha=0.18)
+        self.condensed_fill.set_visible(False)
+        self.ax.add_collection(self.condensed_fill)
+
+        self.ax.set_xlim(0, 1)
+        self.ax.set_ylim(0, max(1, self.N))
+        self.ax.yaxis.set_major_locator(MaxNLocator(integer=True))
+        self.ax.xaxis.set_major_locator(MultipleLocator(1))
+        self.ax.xaxis.set_major_formatter(FuncFormatter(self._format_tick_value))
+        self.legend = self.ax.legend(fontsize=7)
+
+    def _mean_label(self):
+        return f'Mean (N/2 = {self.N/2:.1f})'
+
+    def _set_mode(self, mode):
+        self.mode = mode
+        is_realtime = mode == 'realtime'
+        self.history_line.set_visible(is_realtime)
+        self.condensed_line.set_visible(not is_realtime)
+        self.condensed_fill.set_visible(not is_realtime)
+        
+        if is_realtime:
+            self.ax.set_title(r'Real Time Trajectory of $X_i$', pad=12)
+            self.ax.grid(True, linestyle='--', alpha=0.4)
+        else:
+            self.ax.set_title(r'Timelapsed Trajectory of $X_i$', pad=12)
+            self.ax.grid(True, linestyle='--', alpha=0.3)
 
     def update(self, history, N=None):
         if N is not None:
             self.N = int(N)
         self.history = list(history)
-        self.draw()
+        self._set_mode('realtime')
+        self._update_mean_line()
+        self._update_realtime_plot()
 
-    def draw(self):
-        self.ax.clear()
-        self.ax.set_title(r'Real Time Trajectory of $X_i$', pad=12)
-        self.ax.set_xlabel('Iteration', labelpad=5)
-        self.ax.set_ylabel(r'$X_i$ (balls in A)')
-        self.ax.grid(True, linestyle='--', alpha=0.4)
-        
-        if len(self.history) == 0:
-            self.ax.figure.canvas.draw_idle()
+    def _update_realtime_plot(self):
+        if not self.history:
+            self.history_line.set_data([], [])
+            self.last_point.set_data([], [])
+            self.ax.set_xlim(0, 1)
+            self.ax.set_ylim(0, max(1, self.N))
             return
-        
-        self.ax.axhline(self.N / 2, color='r', alpha=0.8, linestyle='--', linewidth=0.5, label=f'Mean (N/2 = {self.N/2:.1f})')
-        
-        x = list(range(len(self.history)))
-        y = self.history
-        self.ax.plot(x, y, '-b', lw=1)
-        
-        # Highlight most recent point
-        self.ax.plot(x[-1], y[-1], 'o', color='#fb923c')
+
+        x = np.arange(len(self.history))
+        y = np.asarray(self.history)
+        self.history_line.set_data(x, y)
+        self.last_point.set_data([x[-1]], [y[-1]])
+
         xmin = 0
         xmax = x[-1] + 1
         self.ax.set_xlim(xmin, xmax)
         self.ax.set_ylim(0, max(1, self.N))
-        
-        # Adaptive integer step for x ticks so gaps grow smoothly
-        x_range = max(1, int(xmax - xmin))
-        target_ticks = 6
-        raw_step = max(1, int(round(x_range / float(target_ticks))))
-        preferred_steps = [1, 2, 5, 10, 20, 25, 50, 100, 200, 500, 1000]
-        step = next((s for s in preferred_steps if s >= raw_step), preferred_steps[-1])
-        self.ax.xaxis.set_major_locator(MultipleLocator(step))
-        
-        # y ticks remain integer-only
+        self._update_xticks(xmax - xmin)
         self.ax.yaxis.set_major_locator(MaxNLocator(integer=True))
-        self.ax.legend(fontsize=7) 
-        self.ax.figure.canvas.draw_idle()
 
-    
+    def _update_xticks(self, x_range):
+        x_range = max(1, float(x_range))
+        target_ticks = 6
+        rough_step = max(1.0, x_range / target_ticks)
+        magnitude = 10 ** math.floor(math.log10(rough_step))
+        for multiplier in (1, 2, 5, 10):
+            step = magnitude * multiplier
+            if x_range / step <= target_ticks:
+                break
+        self.ax.xaxis.set_major_locator(MultipleLocator(step))
+
+    def _update_mean_line(self):
+        y = self.N / 2.0
+        self.mean_line.set_ydata([y, y])
+        
+        if self.legend is not None:
+            for text in self.legend.texts:
+                if text.get_text().startswith('Mean'):
+                    text.set_text(self._mean_label())
+                    break
 
     def show_condensed_time(self, history, N, target_points=800):
-        """Render a condensed time-series that represents a long history compactly.
-
-        Approach:
-        - If history length <= target_points, draw normally.
-        - Otherwise split the history into `target_points` buckets and for each bucket
-          compute min, max, and mean. Plot the mean as a thin line and shade between
-          min/max to show variability inside a bucket.
-        """
-
         self.N = int(N)
         hist = np.asarray(history, dtype=float)
         L = len(hist)
-        self.ax.clear()
-        self.ax.set_title(r'Timelapsed Trajectory of $X_i$', pad=12)
-        self.ax.set_xlabel('Iteration', labelpad=5)
-        self.ax.set_ylabel(r'$X_i$ (balls in A)')
-        self.ax.grid(True, linestyle='--', alpha=0.3)
+        self._set_mode('condensed')
+        self._update_mean_line()
 
         if L == 0:
-            self.ax.figure.canvas.draw_idle()
+            self.condensed_line.set_data([], [])
+            self.condensed_fill.set_verts([])
+            self.last_point.set_data([], [])
             return
-        
-        self.ax.axhline(self.N / 2, color='r', alpha=0.8, linestyle='--', linewidth=0.5, label=f'Mean (N/2 = {self.N/2:.1f})')
 
         if L <= target_points:
-            x = np.arange(L)
-            self.ax.plot(x, hist, '-b', lw=1)
-            self.ax.plot(x[-1], hist[-1], 'o', color='#fb923c')
-            xmin = 0
-            xmax = max(1, L - 1)
-            self.ax.set_xlim(xmin, xmax)
-            self.ax.set_ylim(0, max(1, self.N))
-            self.ax.xaxis.set_major_locator(MaxNLocator(integer=True))
-            self.ax.yaxis.set_major_locator(MaxNLocator(integer=True))
-            self.ax.legend(fontsize=7) 
-            self.ax.figure.canvas.draw_idle()
-            return
+            xs = np.arange(L, dtype=float)
+            means = hist
+            mins = hist
+            maxs = hist
+        else:
+            bins = min(target_points, L)
+            counts = np.full(bins, L // bins, dtype=int)
+            remainder = L % bins
+            counts[:remainder] += 1
+            indices = np.cumsum(counts)
+            start = 0
+            xs = []
+            means = []
+            mins = []
+            maxs = []
+            
+            for end in indices:
+                segment = hist[start:end]
+                if segment.size == 0:
+                    continue
+                xs.append((start + end - 1) / 2.0)
+                means.append(segment.mean())
+                mins.append(segment.min())
+                maxs.append(segment.max())
+                start = end
+                
+            xs = np.asarray(xs)
+            means = np.asarray(means)
+            mins = np.asarray(mins)
+            maxs = np.asarray(maxs)
 
-        # bucketize into approximately target_points windows
-        bins = min(target_points, L)
-        # compute start/end indices for each bin
-        counts = np.full(bins, L // bins, dtype=int)
-        remainder = L % bins
-        counts[:remainder] += 1
-        indices = np.cumsum(counts)
-        start = 0
-        means = []
-        mins = []
-        maxs = []
-        xs = []
-        for i, end in enumerate(indices):
-            seg = hist[start:end]
-            if seg.size == 0:
-                continue
-            means.append(seg.mean())
-            mins.append(seg.min())
-            maxs.append(seg.max())
-            # place x at the mid-iteration of the bucket
-            xs.append((start + end - 1) / 2.0)
-            start = end
-
-        xs = np.asarray(xs)
-        means = np.asarray(means)
-        mins = np.asarray(mins)
-        maxs = np.asarray(maxs)
-
-        # plot mean line and shaded envelope between min and max
-        self.ax.plot(xs, means, '-b', lw=1)
-        self.ax.fill_between(xs, mins, maxs, color='C0', alpha=0.18)
-        # highlight last bucket's last value
-        self.ax.plot(xs[-1], means[-1], 'o', color='#fb923c')
-
-        self.ax.set_xlim(0, L)
+        self.condensed_line.set_data(xs, means)
+        verts = self._build_fill_between(xs, mins, maxs)
+        self.condensed_fill.set_verts([verts] if len(verts) else [])
+        
+        if xs.size > 0:
+            self.last_point.set_data([xs[-1]], [means[-1]])
+        else:
+            self.last_point.set_data([], [])
+            
+        self.ax.set_xlim(0, max(1, L))
+        self._update_xticks(max(1, L))
         self.ax.set_ylim(0, max(1, self.N))
         self.ax.yaxis.set_major_locator(MaxNLocator(integer=True))
-        self.ax.legend(fontsize=7)
-        self.ax.figure.canvas.draw_idle()
+
+    def _build_fill_between(self, xs, mins, maxs):
+        if xs.size == 0:
+            return np.empty((0, 2))
+        upper = np.column_stack([xs, maxs])
+        lower = np.column_stack([xs[::-1], mins[::-1]])
+        return np.vstack([upper, lower])
+
+    def _format_tick_value(self, value, _pos):
+        value = int(round(value))
+        abs_val = abs(value)
+        if abs_val >= 1_000_000:
+            formatted = f"{value / 1_000_000:.1f}".rstrip('0').rstrip('.')
+            return f"{formatted}M"
+        if abs_val >= 1_000:
+            formatted = f"{value / 1_000:.1f}".rstrip('0').rstrip('.')
+            return f"{formatted}K"
+        return str(value)

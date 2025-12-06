@@ -47,6 +47,7 @@ class BallsPanel:
             self.ax.set_title('The Ehrenfest Model')
             subtitle = r'A stochastic simulation of balls moving between two boxes.'
             subsubtitle = r'$X_i$ ~ number of balls in Box A at iteration $i$'
+            
             try:
                 self.ax.text(
                     0.5, 0.985, subtitle,
@@ -146,4 +147,3 @@ class BallsPanel:
             self.scatter.set_offsets(np.empty((0, 2)))
         self.ax.set_xlim(0, 1)
         self.ax.set_ylim(0, 1)
-        self.ax.figure.canvas.draw_idle()

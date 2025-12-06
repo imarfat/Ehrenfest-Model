@@ -11,8 +11,8 @@ from .stateDiagram import StateDiagram
 from .plotPanel import PlotPanel
 import threading
 
-# Maximum allowed number of balls (for performance reasons)
-MAX_N = 6000
+# Maximum allowed number of balls (for UI & performance reasons)
+MAX_N = 10000
 
 class EhrenfestApp:
     
@@ -22,6 +22,7 @@ class EhrenfestApp:
         self.running = False
         self.model = EhrenfestModel(N=20)
         self.speed_ms = 500
+        self._animated_widgets = []
 
         self.fig = plt.Figure(figsize=(10, 6), dpi=100)
         
@@ -29,7 +30,6 @@ class EhrenfestApp:
         try:
             rng = np.random.RandomState(0)
             noise = rng.normal(loc=0.0, scale=1.0, size=(256, 256))
-            # Normalize and slightly bias towards white
             noise = (noise - noise.min()) / (noise.max() - noise.min())
             noise = 0.9 + 0.06 * (noise - 0.5)
             ax_bg = self.fig.add_axes([0, 0, 1, 1], zorder=0)
@@ -188,6 +188,9 @@ class EhrenfestApp:
 
         c1 = hex_to_rgb(color_start)
         c2 = hex_to_rgb(color_end)
+        widget._anim_colors = (color_start, color_end)
+        widget._hover_anim_enabled = True
+        widget._is_hovered = False
 
         steps = 20
         step_size = 1.0 / steps
@@ -214,6 +217,9 @@ class EhrenfestApp:
                 pass
 
         def animate():
+            if not widget._hover_anim_enabled:
+                widget._anim_running = False
+                return
             diff = widget._anim_target - widget._anim_current
             
             # If close enough to target, snap and stop
@@ -239,57 +245,113 @@ class EhrenfestApp:
                 widget.after(delay, animate)
 
         def start_anim(target):
+            if not widget._hover_anim_enabled:
+                self._apply_hover_colors(widget)
+                return
             widget._anim_target = target
             if not widget._anim_running:
                 widget._anim_running = True
                 animate()
 
         # Set initial state
-        widget.configure(fg_color=color_start, hover_color=color_start)
+        self._apply_hover_colors(widget)
 
-        widget.bind("<Enter>", lambda e: start_anim(1.0), add="+")
-        widget.bind("<Leave>", lambda e: start_anim(0.0), add="+")
+        def _on_enter(_event):
+            widget._is_hovered = True
+            if widget._hover_anim_enabled:
+                start_anim(1.0)
+            else:
+                self._apply_hover_colors(widget)
+
+        def _on_leave(_event):
+            widget._is_hovered = False
+            if widget._hover_anim_enabled:
+                start_anim(0.0)
+            else:
+                self._apply_hover_colors(widget)
+
+        widget.bind("<Enter>", _on_enter, add="+")
+        widget.bind("<Leave>", _on_leave, add="+")
+        self._animated_widgets.append(widget)
+
+    def _apply_hover_colors(self, widget):
+        colors = getattr(widget, '_anim_colors', None)
+        if not colors:
+            return
+        color_start, color_end = colors
+        if widget._hover_anim_enabled:
+            widget.configure(fg_color=color_start, hover_color=color_start)
+        else:
+            if getattr(widget, '_is_hovered', False):
+                widget.configure(fg_color=color_end, hover_color=color_end)
+            else:
+                widget.configure(fg_color=color_start, hover_color=color_end)
+
+    def _set_hover_animation_enabled(self, enabled):
+        """Toggle the custom hover animation for all tracked widgets."""
+        for widget in self._animated_widgets:
+            colors = getattr(widget, '_anim_colors', None)
+            if not colors:
+                continue
+            widget._hover_anim_enabled = enabled
+            widget._anim_target = 0.0
+            widget._anim_current = 0.0
+            widget._anim_running = False
+            self._apply_hover_colors(widget)
 
     def start(self):
         if not self.running:
             self.running = True
+            self._set_hover_animation_enabled(False)
             self._run_step()
 
     def pause(self):
-        self.running = False
+        if self.running:
+            self.running = False
+            self._set_hover_animation_enabled(True)
 
     def reset(self):
+        val = self._read_and_clamp_n()
+        if val is None:
+            return
         # Reset model and panels
-        self.model.reset(N=self.n_var.get())
+        self.model.reset(N=val)
         self.balls_panel.update(self.model.getState(), self.model.N)
         self.state_diagram.update(self.model.getState(), self.model.N, probs=self.model.getTransitionProbabilities())
         self.plot_panel.update(self.model.getHistory(), self.model.N)
         self.canvas.draw_idle()
         self.status.configure(text= f'Iteration: {self.model.iteration}\nX = {self.model.getState()}')
 
-    def on_n_change(self):
+    def _read_and_clamp_n(self, show_warning=True):
+        """Parse the N entry, clamp to [1, MAX_N], update the UI, and return the int."""
         try:
             raw = self.n_var.get()
             val = int(raw)
         except Exception:
-            # If parsing fails just return without changing
-            return
-        # Clamp to valid range
+            return None
+
+        original_val = val
         if val < 1:
             val = 1
-        # If the user typed a value larger than MAX_N, clamp it and notify the user
-        original_val = val
         if val > MAX_N:
             val = MAX_N
+
+        if val != original_val:
             try:
-                self.n_var.set(val)
-                # Ensure numeric text in spinbox matches
-                self.n_spin.delete(0, tk.END)
-                self.n_spin.insert(0, str(val))
+                self.n_var.set(str(val))
+                self.n_entry.delete(0, tk.END)
+                self.n_entry.insert(0, str(val))
             except Exception:
                 pass
-            messagebox.showwarning("Too many balls!", f"Maximum allowed N is {MAX_N}. Setting N to {MAX_N}.")
-            
+            if show_warning and original_val > MAX_N:
+                messagebox.showwarning("Too many balls!", f"Maximum allowed N is {MAX_N}. Setting N to {MAX_N}.")
+        return val
+
+    def on_n_change(self):
+        val = self._read_and_clamp_n()
+        if val is None:
+            # If parsing fails just return without changing
+            return
         # Change N and reset iteration counter
         self.model.setN(val)
         self.model.iteration = 0
@@ -326,7 +388,6 @@ class EhrenfestApp:
         try:
             self.speed_ms = int(float(self.speed_slider.get()))
         except Exception:
-            # Fallback if value cannot be parsed
             return
         
         try:
@@ -341,12 +402,13 @@ class EhrenfestApp:
             return
 
         X, probs = self.model.step()
-        # Update panels and status
+        
         self.balls_panel.update(X, self.model.N)
         self.state_diagram.update(X, self.model.N, probs=probs)
         self.plot_panel.update(self.model.getHistory(), self.model.N)
         self.status.configure(text = f'Iteration: {self.model.iteration}\nX = {self.model.getState()}')
         self.canvas.draw_idle()
+        
         # Schedule next
         self.root.after(self.speed_ms, self._run_step)
 
@@ -378,23 +440,23 @@ class EhrenfestApp:
             except Exception:
                 start_X = getattr(self.model, 'X', 0)
             N = self.model.N
-            from .ehrenfestModel import EhrenfestModel as _Model  # local import inside thread
+            
+            from .ehrenfestModel import EhrenfestModel as _Model  
             m = _Model(N=N, initial=start_X)
-            # include the initial state as the first entry so the timelapse shows X_i at t=0
+            
+            # Include the initial state as the first entry so the timelapse shows X_i at t=0
             hist = m.getHistory()
             for _ in range(M):
                 x, _ = m.step()
                 hist.append(x)
 
-            # schedule plotting back on main thread
+            # Schedule plotting back on main thread
             def finish():
                 try:
-                    # show condensed time-series in the plot panel
-                    # this will create a compressed visualization that represents all iterations
                     self.plot_panel.show_condensed_time(hist, N)
                     self.canvas.draw_idle()
                 finally:
-                    # re-enable buttons
+                    # Re-enable buttons
                     try:
                         self.timelapse_btn.configure(state=tk.NORMAL)
                         self.start_btn.configure(state=tk.NORMAL)

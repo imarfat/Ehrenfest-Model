@@ -1,5 +1,6 @@
 import matplotlib.patches as mpatches # type: ignore
 
+
 class StateDiagram:
     def __init__(self, ax, N=20):
         self.ax = ax
@@ -10,85 +11,143 @@ class StateDiagram:
             'neighbor': '#e5e7eb',
             'text': '#111827'
         }
+        self._xs = [0.2, 0.5, 0.8]
+        self._y = 0.62
+        self._arrow_pad = 0.08
+        self._setup_static_elements()
+
+    def _setup_static_elements(self):
+        self.ax.set_title('State Diagram / Markov Chain')
+        subtitle = 'Simplified 3-state view. The numbers inside \n of the ovals represent the value of $X_i$.'
+        try:
+            self.subtitle = self.ax.text(
+                0.5, 0.955, subtitle,
+                ha='center', va='top', transform=self.ax.transAxes,
+                fontsize=9, color=self.colors.get('text', 'black')
+            )
+        except Exception:
+            self.subtitle = None
         self.ax.axis('off')
+
+        self.circles = []
+        self.labels = []
+        
+        for x in self._xs:
+            circ = mpatches.Circle((x, self._y), 0.08, edgecolor='k', facecolor=self.colors['neighbor'])
+            circ.set_visible(False)
+            self.ax.add_patch(circ)
+            txt = self.ax.text(x, self._y, '', ha='center', va='center', color=self.colors['text'], fontsize=10)
+            txt.set_visible(False)
+            self.circles.append(circ)
+            self.labels.append(txt)
+
+        arrow_style = dict(arrowstyle='->', linewidth=1.0, mutation_scale=12)
+        self.arrow_center_to_left = mpatches.FancyArrowPatch(
+            (self._xs[1] - self._arrow_pad, self._y),
+            (self._xs[0] + self._arrow_pad, self._y),
+            **arrow_style
+        )
+        self.arrow_left_to_center = mpatches.FancyArrowPatch(
+            (self._xs[0] + self._arrow_pad, self._y - 0.04),
+            (self._xs[1] - self._arrow_pad + 0.01, self._y - 0.04),
+            connectionstyle='arc3,rad=0.8', **arrow_style
+        )
+        self.arrow_center_to_right = mpatches.FancyArrowPatch(
+            (self._xs[1] + self._arrow_pad, self._y),
+            (self._xs[2] - self._arrow_pad, self._y),
+            **arrow_style
+        )
+        self.arrow_right_to_center = mpatches.FancyArrowPatch(
+            (self._xs[2] - self._arrow_pad, self._y - 0.04),
+            (self._xs[1] + self._arrow_pad - 0.01, self._y - 0.04),
+            connectionstyle='arc3,rad=-0.8', **arrow_style
+        )
+
+        self.arrows = [
+            self.arrow_center_to_left,
+            self.arrow_left_to_center,
+            self.arrow_center_to_right,
+            self.arrow_right_to_center,
+        ]
+        for arrow in self.arrows:
+            arrow.set_visible(False)
+            self.ax.add_patch(arrow)
+
+        self.prob_text_left_above = self.ax.text(
+            (self._xs[0] + self._xs[1]) / 2 + 0.01,
+            self._y + 0.04,
+            '', ha='center', va='bottom', color=self.colors['text'], fontsize=9
+        )
+        self.prob_text_left_below = self.ax.text(
+            (self._xs[0] + self._xs[1]) / 2,
+            self._y - 0.18,
+            '', ha='center', va='top', color=self.colors['text'], fontsize=9
+        )
+        self.prob_text_right_above = self.ax.text(
+            (self._xs[1] + self._xs[2]) / 2 - 0.01,
+            self._y + 0.04,
+            '', ha='center', va='bottom', color=self.colors['text'], fontsize=9
+        )
+        self.prob_text_right_below = self.ax.text(
+            (self._xs[1] + self._xs[2]) / 2,
+            self._y - 0.18,
+            '', ha='center', va='top', color=self.colors['text'], fontsize=9
+        )
+        
+        for txt in (
+            self.prob_text_left_above,
+            self.prob_text_left_below,
+            self.prob_text_right_above,
+            self.prob_text_right_below,
+        ):
+            txt.set_visible(False)
+
+        self.ax.set_xlim(0, 1)
+        self.ax.set_ylim(0, 1)
 
     def update(self, X, N=None, probs=None):
         if N is not None:
             self.N = int(N)
         self.X = int(X)
         self.probs = probs
-        self.draw()
+        self._update_artists()
 
-    def draw(self):
-        self.ax.clear()
-        self.ax.set_title('State Diagram / Markov Chain')
-        subtitle = 'Simplified 3-state view. The numbers inside \n of the ovals represent the value of $X_i$.'
-        try:
-            self.ax.text(0.5, 0.955, subtitle, ha='center', va='top', transform=self.ax.transAxes, fontsize=9, color=self.colors.get('text', 'black'))
-        except Exception:
-            # Best-effort placement; ignore failures if text rendering isn't available
-            pass
-        self.ax.axis('off')
-
-        xs = [0.2, 0.5, 0.8]
-        # Raise the diagram slightly
-        ys = 0.62
-        # How far from each state's center the arrow should start/end
-        # Note: use a value equal to or a little larger than the circle radius (0.08)
-        # Note: too-large padding makes only the head visible
-        arrow_pad = 0.08
-        arrow_props = dict(arrowstyle='->', linewidth=1.0, mutation_scale=12)
-        curve_left_props = dict(arrowstyle='->', linewidth=1.0, mutation_scale=12, connectionstyle='arc3,rad=-0.8')
-        curve_right_props = dict(arrowstyle='->', linewidth=1.0, mutation_scale=12, connectionstyle='arc3,rad=0.8')
-        
+    def _update_artists(self):
         states = [self.X - 1, self.X, self.X + 1]
-        # Add state labels, using None for "out-of-bounds" states
-        labels = []
-        for s in states:
-            if s < 0 or s > self.N:
-                labels.append(None)
-            else:
-                labels.append(str(s))
         
-        # Draw states
-        for i, lab in enumerate(labels):
-            if lab is None:
+        for idx, state in enumerate(states):
+            valid = 0 <= state <= self.N
+            self.circles[idx].set_visible(valid)
+            self.labels[idx].set_visible(valid)
+            
+            if not valid:
                 continue
             
-            # Determine circle color
-            face = self.colors['current'] if i == 1 else self.colors['neighbor']
-            
-            circ = mpatches.Circle((xs[i], ys), 0.08, facecolor=face, edgecolor='k')
-            self.ax.add_patch(circ)
-            self.ax.text(xs[i], ys, lab, ha='center', va='center', color=self.colors['text'], fontsize=10)
+            face = self.colors['current'] if idx == 1 else self.colors['neighbor']
+            self.circles[idx].set_facecolor(face)
+            self.labels[idx].set_text(str(state))
 
-        if labels[0] is not None and labels[1] is not None:
-            mid = (xs[0] + xs[1]) / 2
-            # Calculate probability of moving down a state
-            p_down = float(self.X) / float(self.N) if self.N > 0 else 0.0
-            self.ax.annotate('', xy=(xs[0] + arrow_pad, ys), xytext=(xs[1] - arrow_pad, ys), arrowprops=arrow_props)
-            # Draw probability label above the arrow at the midpoint
-            self.ax.text(mid + 0.01, ys + 0.04, f'{p_down:.2f}', ha='center', va='bottom', color=self.colors['text'], fontsize=9)
+        has_left = all(0 <= s <= self.N for s in states[:2])
+        has_right = all(0 <= s <= self.N for s in states[1:])
+
+        self.arrow_center_to_left.set_visible(has_left)
+        self.arrow_left_to_center.set_visible(has_left)
+        self.prob_text_left_above.set_visible(has_left)
+        self.prob_text_left_below.set_visible(has_left)
         
-            p_from_left = (self.N - (self.X - 1)) / self.N if self.N > 0 else 0.0
-            self.ax.annotate('', xy=(xs[1] - arrow_pad + 0.01, ys-0.04), xytext=(xs[0] + arrow_pad, ys-0.04), arrowprops=curve_right_props)
-            # Draw probability label below the curved arrow
-            self.ax.text(mid, ys - 0.18, f'{p_from_left:.2f}', ha='center', va='top', color=self.colors['text'], fontsize=9)
-            
-        if labels[1] is not None and labels[2] is not None:
-            mid = (xs[1] + xs[2]) / 2
-            # Calculate probability of moving up a state
-            p_up = float(self.N - self.X) / float(self.N) if self.N > 0 else 0.0
-            self.ax.annotate('', xy=(xs[2] - arrow_pad, ys), xytext=(xs[1] + arrow_pad, ys), arrowprops=arrow_props)
-            # Draw probability label above the arrow at the midpoint
-            self.ax.text(mid - 0.01, ys + 0.04, f'{p_up:.2f}', ha='center', va='bottom', color=self.colors['text'], fontsize=9)
-            
-            p_from_right = (self.X + 1) / self.N if self.N > 0 else 0.0
-            self.ax.annotate('', xy=(xs[1] + arrow_pad - 0.01, ys-0.04), xytext=(xs[2] - arrow_pad, ys-0.04), arrowprops=curve_left_props)
-            # Draw probability label below the curved arrow
-            mid = (xs[1] + xs[2]) / 2
-            self.ax.text(mid, ys - 0.18, f'{p_from_right:.2f}', ha='center', va='top', color=self.colors['text'], fontsize=9)
+        if has_left and self.N > 0:
+            p_down = float(self.X) / float(self.N)
+            p_from_left = (self.N - (self.X - 1)) / self.N
+            self.prob_text_left_above.set_text(f'{p_down:.2f}')
+            self.prob_text_left_below.set_text(f'{p_from_left:.2f}')
+
+        self.arrow_center_to_right.set_visible(has_right)
+        self.arrow_right_to_center.set_visible(has_right)
+        self.prob_text_right_above.set_visible(has_right)
+        self.prob_text_right_below.set_visible(has_right)
         
-        self.ax.set_xlim(0, 1)
-        self.ax.set_ylim(0, 1)
-        self.ax.figure.canvas.draw_idle()
+        if has_right and self.N > 0:
+            p_up = float(self.N - self.X) / float(self.N)
+            p_from_right = (self.X + 1) / self.N
+            self.prob_text_right_above.set_text(f'{p_up:.2f}')
+            self.prob_text_right_below.set_text(f'{p_from_right:.2f}')
