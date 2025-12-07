@@ -13,6 +13,8 @@ import threading
 
 # Maximum allowed number of balls (for UI & performance reasons)
 MAX_N = 10000
+# Maximum allowed timelapse iterations
+MAX_TIMELAPSE_ITERS = 1000000
 
 class EhrenfestApp:
     
@@ -75,8 +77,7 @@ class EhrenfestApp:
         self.canvas = FigureCanvasTkAgg(self.fig, master=root)
         self.canvas.get_tk_widget().pack(fill=tk.BOTH, expand=1)
 
-        # Animation controls below the visualization
-        anim_ctrl = ctk.CTkFrame(root, fg_color='transparent')
+        anim_ctrl = ctk.CTkFrame(root, fg_color='transparent', bg_color='transparent')
         anim_ctrl.pack(fill=tk.X, padx=10, pady=(4, 0))
         self.anim_var = tk.BooleanVar(value=False)
         self.anim_switch = ctk.CTkSwitch(
@@ -86,12 +87,17 @@ class EhrenfestApp:
             command=self._on_animation_toggle,
             progress_color="#1f4d7a",
         )
-        self.anim_switch.pack(side=tk.LEFT, padx=4, pady=4)
+        self.anim_switch.pack(side=tk.LEFT, padx=4, pady=8)
         self._refresh_animation_toggle_state()
 
         # Controls frame
-        ctrl = ctk.CTkFrame(root, corner_radius=10)
-        ctrl.pack(fill=tk.BOTH, padx=6, pady=6)
+        ctrl = ctk.CTkFrame(root, corner_radius=0)
+        ctrl.pack(side=tk.BOTTOM, fill=tk.X, expand=False, padx=0, pady=0)
+        try:
+            top_border = tk.Frame(ctrl, height=1, background="#000000", borderwidth=0, highlightthickness=0)
+            top_border.pack(fill=tk.X, side=tk.TOP)
+        except Exception:
+            pass
 
         # Buttons frame
         btn_frame = ctk.CTkFrame(ctrl, fg_color='transparent')
@@ -391,7 +397,6 @@ class EhrenfestApp:
                 widget.configure(fg_color=color_start, hover_color=color_end)
 
     def _set_hover_animation_enabled(self, enabled):
-        """Toggle the custom hover animation for all tracked widgets."""
         for widget in self._animated_widgets:
             colors = getattr(widget, '_anim_colors', None)
             if not colors:
@@ -443,13 +448,14 @@ class EhrenfestApp:
         """Pack and show the N controls and speed slider."""
         if self.advanced_visible:
             return
+        
         try:
             self.n_frame.pack(side=tk.LEFT, padx=8, pady=4)
             self.speed_frame.pack(side=tk.LEFT, padx=8, pady=14, fill=tk.Y)
         except Exception:
             pass
         self.advanced_visible = True
-        # Indicate open state with a left angle bracket, but keep styling minimal
+        
         try:
             self.advanced_btn.configure(text='〈')
         except Exception:
@@ -495,8 +501,10 @@ class EhrenfestApp:
         self.balls_panel.cancel_animation()
         self._resume_after_cancelled_animation()
         val = self._read_and_clamp_n()
+        
         if val is None:
             return
+        
         # Reset model and panels
         self.model.reset(N=val)
         self.balls_panel.update(self.model.getState(), self.model.N)
@@ -547,7 +555,7 @@ class EhrenfestApp:
         self.plot_panel.update(self.model.getHistory(), self.model.N)
         
         self.canvas.draw_idle()
-        # Update status to show reset iteration
+        
         try:
             self.status['text'] = f'Iteration: {self.model.iteration}\nX = {getattr(self.model, "X", "?")}'
         except Exception:
@@ -606,6 +614,22 @@ class EhrenfestApp:
         except Exception:
             return
 
+        if M > MAX_TIMELAPSE_ITERS:
+            M = MAX_TIMELAPSE_ITERS
+            try:
+                self.timelapse_iters_var.set(str(M))
+                self.timelapse_entry.delete(0, tk.END)
+                self.timelapse_entry.insert(0, str(M))
+            except Exception:
+                pass
+            try:
+                messagebox.showwarning(
+                    "Too many iterations",
+                    f"Maximum timelapse iterations is {MAX_TIMELAPSE_ITERS:,}."
+                )
+            except Exception:
+                pass
+
         # Disable UI buttons while running
         self.timelapse_btn.configure(state=tk.DISABLED)
         self.start_btn.configure(state=tk.DISABLED)
@@ -615,7 +639,7 @@ class EhrenfestApp:
         # Background thread
         def worker():
             # Make a private model copy so the running simulation doesn't disturb the UI model state.
-            # Prefer the model's initial X (first history element) so timelapse begins at the true start.
+            # Get the model's initial X_i so timelapse begins at the true start.
             try:
                 hist_src = self.model.getHistory()
                 if hist_src and len(hist_src) > 0:
@@ -629,7 +653,6 @@ class EhrenfestApp:
             from .ehrenfestModel import EhrenfestModel as _Model  
             m = _Model(N=N, initial=start_X)
             
-            # Include the initial state as the first entry so the timelapse shows X_i at t=0
             hist = m.getHistory()
             for _ in range(M):
                 x, _ = m.step()
