@@ -7,11 +7,12 @@ A desktop GUI application demonstrating the **Ehrenfest model of diffusion** usi
 - **Left panel:** Ball distribution (Box A / Box B)  
 - **Top-right panel:** Simplified state diagram with transition probabilities  
 - **Bottom-right panel:** Real-time plot of X (balls in A) vs time  
-- **Controls:** Start, Pause, Reset, Timelapse, change number of balls (N) and simulation speed
+- **Controls:** Start, Pause, Reset, Timelapse, Animate, Change number of balls (N) and Adjust simulation speed
 
 Pictured below is the simulation window:
 
-<img width="610" height="370" alt="Ehrenfest GUI" src="https://github.com/user-attachments/assets/7b7f0f46-bdc6-4706-8ab4-34a88b410bae" />
+<img width="610" height="370" alt="Ehrenfest GUI" src="https://github.com/user-attachments/assets/8553e6f4-ad88-432a-94e2-4c816162974e" />
+
 
 ## Requirements
 
