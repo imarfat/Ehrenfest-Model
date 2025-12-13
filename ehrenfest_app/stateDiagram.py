@@ -18,7 +18,9 @@ class StateDiagram:
 
     def _setup_static_elements(self):
         self.ax.set_title('State Diagram / Markov Chain')
-        subtitle = 'Simplified 3-state view. The numbers inside \n of the ovals represent the value of $X_i$.'
+        subtitle = ('Simplified 3-state view. We label the states using an integer\n'
+                    r'$n \in \{0, ..., N\}$ corresponding to the number of balls in Box A.'
+        )
         try:
             self.subtitle = self.ax.text(
                 0.5, 0.955, subtitle,

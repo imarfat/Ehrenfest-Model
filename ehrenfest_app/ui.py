@@ -570,6 +570,7 @@ class EhrenfestApp:
         if val is None:
             return
         
+        self.info_label.configure(text="")
         # Reset model and panels
         self.model.reset(N=val)
         self.balls_panel.update(self.model.getState(), self.model.N)
