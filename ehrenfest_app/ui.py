@@ -26,6 +26,7 @@ class EhrenfestApp:
         self.speed_ms = 500
         self._waiting_for_animation = False
         self._animated_widgets = []
+        self._pending_panel_update = None
 
         self.fig = plt.Figure(figsize=(10, 6), dpi=100)
         
@@ -89,6 +90,15 @@ class EhrenfestApp:
         )
         self.anim_switch.pack(side=tk.LEFT, padx=4, pady=8)
         self._refresh_animation_toggle_state()
+        
+        # Status message label (for non-intrusive notifications)
+        self.info_label = ctk.CTkLabel(
+            anim_ctrl,
+            text="",
+            font=("Segoe UI", 10),
+            text_color="#555555"
+        )
+        self.info_label.pack(side=tk.LEFT, padx=12)
 
         # Controls frame
         ctrl = ctk.CTkFrame(root, corner_radius=0)
@@ -280,6 +290,51 @@ class EhrenfestApp:
         self.state_diagram.update(self.model.getState(), self.model.N, probs=self.model.getTransitionProbabilities())
         self.plot_panel.update(self.model.getHistory(), self.model.N)
         self.canvas.draw_idle()
+        
+        # Keyboard shortcuts
+        self._bind_keyboard_shortcuts()
+    
+    def _bind_keyboard_shortcuts(self):
+        self.root.bind('<space>', self._on_space_key)
+        self.root.bind('<r>', self._on_reset_key)
+        self.root.bind('<R>', self._on_reset_key)
+        self.root.bind('<Up>', self._on_up_key)
+        self.root.bind('<Down>', self._on_down_key)
+    
+    def _on_space_key(self, event=None):
+        """Toggle start/pause on Space"""
+        # Ignore if focus is in an entry widget
+        if isinstance(self.root.focus_get(), (tk.Entry, ctk.CTkEntry)):
+            return
+        if self.running:
+            self.pause()
+        else:
+            self.start()
+        return 'break'
+    
+    def _on_reset_key(self, event=None):
+        """Reset simulation on R"""
+        # Ignore if focus is in an entry widget
+        if isinstance(self.root.focus_get(), (tk.Entry, ctk.CTkEntry)):
+            return
+        self.reset()
+        return 'break'
+    
+    def _on_up_key(self, event=None):
+        """Increase N on Up arrow"""
+        # Ignore if focus is in an entry widget
+        if isinstance(self.root.focus_get(), (tk.Entry, ctk.CTkEntry)):
+            return
+        self.adjust_n(1)
+        return 'break'
+    
+    def _on_down_key(self, event=None):
+        """Decrease N on Down arrow"""
+        # Ignore if focus is in an entry widget
+        if isinstance(self.root.focus_get(), (tk.Entry, ctk.CTkEntry)):
+            return
+        self.adjust_n(-1)
+        return 'break'
     
     def _on_n_mousewheel(self, event):
         if event.delta > 0:
@@ -436,6 +491,14 @@ class EhrenfestApp:
 
     def _on_ball_animation_complete(self):
         self._waiting_for_animation = False
+        
+        if self._pending_panel_update is not None:
+            data = self._pending_panel_update
+            self._pending_panel_update = None
+            self.state_diagram.update(data['X'], data['N'], probs=data['probs'])
+            self.plot_panel.update(data['history'], data['N'])
+            self.canvas.draw_idle()
+        
         if self.running:
             self.root.after(self.speed_ms, self._run_step)
 
@@ -489,6 +552,7 @@ class EhrenfestApp:
             self.running = True
             self._set_hover_animation_enabled(False)
             self._waiting_for_animation = False
+            self.info_label.configure(text="")
             self._run_step()
 
     def pause(self):
@@ -593,20 +657,38 @@ class EhrenfestApp:
         X, probs = self.model.step()
         
         animation_active = self.balls_panel.update(X, self.model.N)
-        self.state_diagram.update(X, self.model.N, probs=probs)
-        self.plot_panel.update(self.model.getHistory(), self.model.N)
-        self.status.configure(text = f'Iteration: {self.model.iteration}\nX = {self.model.getState()}')
-        self.canvas.draw_idle()
         
-        # Schedule next
+        # Lazy panel updates: defer StateDiagram and PlotPanel during animation
         if animation_active:
+            # Store pending update data
+            self._pending_panel_update = {
+                'X': X,
+                'N': self.model.N,
+                'probs': probs,
+                'history': self.model.getHistory().copy(),
+                'iteration': self.model.iteration,
+            }
             self._waiting_for_animation = True
         else:
+            # No animation - update panels
+            self.state_diagram.update(X, self.model.N, probs=probs)
+            self.plot_panel.update(self.model.getHistory(), self.model.N)
             self._waiting_for_animation = False
             self.root.after(self.speed_ms, self._run_step)
+        
+        self.status.configure(text = f'Iteration: {self.model.iteration}\nX = {self.model.getState()}')
+        self.canvas.draw_idle()
 
     def on_timelapse(self):
         """Starts a "timelapsed" run in a background thread, collecting history and then plotting it."""
+        if self.running:
+            self.pause()
+            self.info_label.configure(text="⏸ Simulation paused — press Start to continue")
+        
+        self.balls_panel.cancel_animation()
+        self._waiting_for_animation = False
+        self._pending_panel_update = None
+        
         try:
             M = int(self.timelapse_iters_var.get())
             if M <= 0:
