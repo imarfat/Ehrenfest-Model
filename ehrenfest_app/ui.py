@@ -560,6 +560,7 @@ class EhrenfestApp:
             self.running = False
             self._set_hover_animation_enabled(True)
             self._waiting_for_animation = False
+            self.info_label.configure(text="⏸ Simulation paused — press Start to continue")
 
     def reset(self):
         self.balls_panel.cancel_animation()
@@ -683,7 +684,6 @@ class EhrenfestApp:
         """Starts a "timelapsed" run in a background thread, collecting history and then plotting it."""
         if self.running:
             self.pause()
-            self.info_label.configure(text="⏸ Simulation paused — press Start to continue")
         
         self.balls_panel.cancel_animation()
         self._waiting_for_animation = False
