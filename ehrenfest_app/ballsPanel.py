@@ -206,19 +206,16 @@ class BallsPanel:
 
     def _compute_point_size(self, cell_w, cell_h):
         r = 0.6 * min(cell_w, cell_h)
-        if self.N <= 20:
-            return np.pi * (r * 300)**2
-        if self.N < 100:
-            return np.pi * (r * 250)**2
-        if self.N < 200:
-            return np.pi * (r * 200)**2
-        if self.N < 500:
-            return np.pi * (r * 190)**2
-        if self.N < 1500:
-            return np.pi * (r * 180)**2
-        if self.N < 3000:
-            return np.pi * (r * 160)**2
-        return np.pi * (r * 140)**2
+        if self.N <= 2000:
+            # Continuous scaling for N <= 2000
+            scale = 300 - 160 * min(1.0, (self.N - 20) / 1980)
+        else:
+            if self.N < 3000:
+                scale = 160
+            else:
+                scale = 140
+        
+        return np.pi * (r * scale)**2
 
     def _create_box_outline(self, key, x0, y0, w, h, label):
         lines = {}
