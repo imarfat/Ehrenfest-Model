@@ -1,168 +1,40 @@
 import tkinter as tk
 from tkinter import messagebox
 import customtkinter as ctk  # type: ignore
-from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg # type: ignore
-import matplotlib.pyplot as plt # type: ignore
-import numpy as np # type: ignore
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg  # type: ignore
+import matplotlib.pyplot as plt  # type: ignore
+import numpy as np  # type: ignore
 import os
-from PIL import Image, ImageOps # type: ignore
+import threading
 
 from .ehrenfestModel import EhrenfestModel
 from .ballsPanel import BallsPanel
 from .stateDiagram import StateDiagram
 from .plotPanel import PlotPanel
-import threading
+from .translator import Translator
+from .uiHelpers import GrainBackground, HoverAnimationManager, create_grain_image, load_translate_icon
+from .simulationController import SimulationController
 
 # Maximum allowed number of balls (for UI & performance reasons)
 MAX_N = 10000
 # Maximum allowed timelapse iterations
 MAX_TIMELAPSE_ITERS = 1000000
 
-LANGUAGE_TEXT = {
-    'title': {
-        'en': 'Ehrenfest Model Simulation',
-        'hr': 'Simulacija Ehrenfestovog modela',
-    },
-    'anim_switch': {
-        'en': 'Animate ball transfers (N ≤ 200)',
-        'hr': 'Animiraj prijenose kuglica (N ≤ 200)',
-    },
-    'start_button': {
-        'en': '▶ Start',
-        'hr': '▶ Pokreni',
-    },
-    'pause_button': {
-        'en': '⏸ Pause',
-        'hr': '⏸ Pauza',
-    },
-    'reset_button': {
-        'en': '⟳ Reset',
-        'hr': '⟳ Reset',
-    },
-    'balls_label': {
-        'en': 'Balls (N):',
-        'hr': 'Kuglice (N):',
-    },
-    'speed_label': {
-        'en': 'Speed (non-animated)',
-        'hr': 'Brzina (bez animacije)',
-    },
-    'timelapse_heading': {
-        'en': 'Timelapse',
-        'hr': 'Ubrzani prikaz',
-    },
-    'iterations_label': {
-        'en': 'Iterations:',
-        'hr': 'Iteracije:',
-    },
-    'timelapse_run': {
-        'en': '🚀 Run',
-        'hr': '🚀 Pokreni',
-    },
-    'paused_info': {
-        'en': '⏸ Simulation paused — press Start to continue',
-        'hr': '⏸ Simulacija pauzirana — pritisnite Pokreni za nastavak',
-    },
-    'too_many_balls_title': {
-        'en': 'Too many balls!',
-        'hr': 'Previše kuglica!',
-    },
-    'too_many_balls_message': {
-        'en': 'Maximum allowed N is {max_n}. Setting N to {max_n}.',
-        'hr': 'Najveći dopušteni N je {max_n}. Postavljam N na {max_n}.',
-    },
-    'too_many_iterations_title': {
-        'en': 'Too many iterations',
-        'hr': 'Previše iteracija',
-    },
-    'too_many_iterations_message': {
-        'en': 'Maximum timelapse iterations is {max_iters:,}.',
-        'hr': 'Maksimalan broj iteracija ubrzanog prikaza je {max_iters:,}.',
-    },
-    'iteration_label': {
-        'en': 'Iteration',
-        'hr': 'Iteracija',
-    },
-    'state_label': {
-        'en': 'X',
-        'hr': 'X',
-    },
-    'balls_panel_title': {
-        'en': 'The Ehrenfest Model',
-        'hr': 'Ehrenfestov difuzijski model',
-    },
-    'balls_panel_subtitle': {
-        'en': 'A stochastic simulation of balls moving between two boxes.',
-        'hr': 'Simulacija nasumičnog prijenosa kuglica između dviju kutija.',
-    },
-    'balls_panel_subsubtitle': {
-        'en': '$X_i$ ~ number of balls in Box A at iteration $i$',
-        'hr': '$X_i$ ~ broj kuglica u kutiji A tijekom $i$-te iteracije',
-    },
-    'box_a_label': {
-        'en': 'Box A',
-        'hr': 'Kutija A',
-    },
-    'box_b_label': {
-        'en': 'Box B',
-        'hr': 'Kutija B',
-    },
-    'state_diagram_title': {
-        'en': 'State Diagram / Markov Chain',
-        'hr': 'Dijagram stanja / Markovljev lanac',
-    },
-    'state_diagram_subtitle': {
-        'en': 'Simplified 3-state view. We label the states using an integer\n$n \\in \\{0, ..., N\\}$ corresponding to the number of balls in Box A.',
-        'hr': 'Pojednostavljeni prikaz s 3 stanja. Stanja označavamo cijelim \nbrojem $n \\in \\{0, ..., N\\}$ koji predstavlja broj kuglica u kutiji A.',
-    },
-    'plot_title_realtime': {
-        'en': 'Real Time Trajectory of $X_i$',
-        'hr': 'Trajektorija $X_i$ u stvarnom vremenu',
-    },
-    'plot_title_condensed': {
-        'en': 'Timelapsed Trajectory of $X_i$',
-        'hr': 'Ubrzana trajektorija $X_i$',
-    },
-    'plot_x_label': {
-        'en': 'Iteration',
-        'hr': 'Iteracija',
-    },
-    'plot_y_label': {
-        'en': '$X_i$ (balls in A)',
-        'hr': '$X_i$ (kuglice u A)',
-    },
-    'plot_mean_label': {
-        'en': 'Mean (N/2 = {value:.1f})',
-        'hr': 'Srednja vrijednost (N/2 = {value:.1f})',
-    },
-    'plot_trajectory_label': {
-        'en': 'Trajectory',
-        'hr': 'Trajektorija',
-    },
-    'plot_current_label': {
-        'en': 'Current value',
-        'hr': 'Trenutna vrijednost',
-    },
-}
-
 class EhrenfestApp:
     
     def __init__(self, root):
         self.root = root
-        self.language = 'en'
+        self.translator = Translator(language='en')
+        self.language = self.translator.language
         self._info_message_key = None
         self._info_message_kwargs = {}
-        self._translate_icon = None
         self.root.title(self._t('title'))
-        self.running = False
         self.model = EhrenfestModel(N=20)
         self.speed_ms = 500
-        self._waiting_for_animation = False
-        self._animated_widgets = []
-        self._pending_panel_update = None
-        self._grain_base_image = self._create_grain_image((512, 512))
-        self._anim_ctrl_bg_label = None
-        self._anim_ctrl_bg_image = None
+        self.hover_animator = HoverAnimationManager()
+        self._grain_base_image = create_grain_image((512, 512))
+        self.grain_background = GrainBackground(self._grain_base_image)
+        self._translate_icon = None
 
         self.fig = plt.Figure(figsize=(10, 6), dpi=100)
         
@@ -219,9 +91,19 @@ class EhrenfestApp:
             pass
         canvas_widget.pack(fill=tk.BOTH, expand=1)
 
+        self.controller = SimulationController(
+            scheduler=self.root,
+            model=self.model,
+            animate_step=lambda X, N: self.balls_panel.update(X, N),
+            apply_panel_updates=self._apply_panel_updates,
+            redraw_canvas=self.canvas.draw_idle,
+            update_status=self._update_status_label,
+            speed_ms=self.speed_ms,
+        )
+
         anim_ctrl = ctk.CTkFrame(root, fg_color='transparent', bg_color='transparent')
         anim_ctrl.pack(fill=tk.X, padx=10, pady=0)
-        self._setup_anim_ctrl_background(anim_ctrl)
+        self.grain_background.attach(anim_ctrl)
         self.anim_var = tk.BooleanVar(value=False)
         self.anim_switch = ctk.CTkSwitch(
             anim_ctrl,
@@ -245,7 +127,7 @@ class EhrenfestApp:
         self.info_label.pack(side=tk.LEFT, padx=12, expand=True, fill=tk.X)
         self._set_info_message()
 
-        self._translate_icon = self._load_translate_icon()
+        self._translate_icon = load_translate_icon(os.path.dirname(__file__))
         self.translate_btn = ctk.CTkButton(
             anim_ctrl,
             text="",
@@ -281,21 +163,21 @@ class EhrenfestApp:
                                        border_width=1.5, border_color="#333434",
                                        corner_radius=8, width=100, height=50)
         self.start_btn.pack(side=tk.LEFT, padx=4)
-        self._apply_hover_animation(self.start_btn, "#FFFFFF", "#A3A3A3")
+        self.hover_animator.apply(self.start_btn, "#FFFFFF", "#A3A3A3")
         
         self.pause_btn = ctk.CTkButton(btn_frame, text=self._t('pause_button'), text_color ="black", 
                                        command=self.pause, fg_color="#FFFFFF",
                                        border_width=1.5, border_color="#333434", 
                                        corner_radius=8, width=100, height=50)
         self.pause_btn.pack(side=tk.LEFT, padx=4)
-        self._apply_hover_animation(self.pause_btn, "#FFFFFF", "#A3A3A3")
+        self.hover_animator.apply(self.pause_btn, "#FFFFFF", "#A3A3A3")
         
         self.reset_btn = ctk.CTkButton(btn_frame, text=self._t('reset_button'), text_color ="black",
                                        command=self.reset, fg_color="#FFFFFF",
                                        border_width=1.5, border_color="#333434",
                                        corner_radius=8, width=100, height=50)
         self.reset_btn.pack(side=tk.LEFT, padx=4)
-        self._apply_hover_animation(self.reset_btn, "#FFFFFF", "#A3A3A3")
+        self.hover_animator.apply(self.reset_btn, "#FFFFFF", "#A3A3A3")
 
         # Controls button
         self.advanced_visible = False
@@ -333,7 +215,7 @@ class EhrenfestApp:
         # Decrement button
         n_down_btn = ctk.CTkButton(
             n_controls,
-            text='−',
+            text='-',
             command=lambda: self.adjust_n(-1),
             width=24,
             height=24,
@@ -448,7 +330,7 @@ class EhrenfestApp:
                                            border_color="#333434", corner_radius=6, 
                                            width=80, height=28)
         self.timelapse_btn.pack(side=tk.LEFT, padx=4)
-        self._apply_hover_animation(self.timelapse_btn, "#FFFFFF", "#A3A3A3")
+        self.hover_animator.apply(self.timelapse_btn, "#FFFFFF", "#A3A3A3")
     
 
         # Initial draw
@@ -474,7 +356,7 @@ class EhrenfestApp:
         # Ignore if focus is in an entry widget
         if isinstance(self.root.focus_get(), (tk.Entry, ctk.CTkEntry)):
             return
-        if self.running:
+        if self.controller.is_running:
             self.pause()
         else:
             self.start()
@@ -511,124 +393,8 @@ class EhrenfestApp:
             self.adjust_n(-1) 
         return "break"         
         
-    def _apply_hover_animation(self, widget, color_start, color_end):
-        def hex_to_rgb(h):
-            h = h.lstrip('#')
-            return tuple(int(h[i:i+2], 16) for i in (0, 2, 4))
-
-        def rgb_to_hex(rgb):
-            return '#{:02x}{:02x}{:02x}'.format(int(rgb[0]), int(rgb[1]), int(rgb[2]))
-
-        c1 = hex_to_rgb(color_start)
-        c2 = hex_to_rgb(color_end)
-        widget._anim_colors = (color_start, color_end)
-        widget._hover_anim_enabled = True
-        widget._is_hovered = False
-
-        steps = 20
-        step_size = 1.0 / steps
-        delay = 10 # ms
-        
-        if not hasattr(widget, '_anim_current'):
-            widget._anim_current = 0.0 
-        if not hasattr(widget, '_anim_target'):
-            widget._anim_target = 0.0
-        if not hasattr(widget, '_anim_running'):
-            widget._anim_running = False
-
-        def update_color():
-            t = widget._anim_current
-            r = int(c1[0] + (c2[0] - c1[0]) * t)
-            g = int(c1[1] + (c2[1] - c1[1]) * t)
-            b = int(c1[2] + (c2[2] - c1[2]) * t)
-            color = rgb_to_hex((r, g, b))
-            try:
-                # Update BOTH fg_color and hover_color to prevent flickering
-                widget.configure(fg_color=color, hover_color=color)
-            except Exception:
-                pass
-
-        def animate():
-            if not widget._hover_anim_enabled:
-                widget._anim_running = False
-                return
-            diff = widget._anim_target - widget._anim_current
-            
-            # If close enough to target, snap and stop
-            if abs(diff) < step_size:
-                widget._anim_current = widget._anim_target
-                update_color()
-                widget._anim_running = False
-                return
-
-            # Move towards target
-            if diff > 0:
-                widget._anim_current += step_size
-                if widget._anim_current > widget._anim_target: 
-                    widget._anim_current = widget._anim_target
-            else:
-                widget._anim_current -= step_size
-                if widget._anim_current < widget._anim_target: 
-                    widget._anim_current = widget._anim_target
-            
-            update_color()
-            
-            if widget._anim_running:
-                widget.after(delay, animate)
-
-        def start_anim(target):
-            if not widget._hover_anim_enabled:
-                self._apply_hover_colors(widget)
-                return
-            widget._anim_target = target
-            if not widget._anim_running:
-                widget._anim_running = True
-                animate()
-
-        # Set initial state
-        self._apply_hover_colors(widget)
-
-        def _on_enter(_event):
-            widget._is_hovered = True
-            if widget._hover_anim_enabled:
-                start_anim(1.0)
-            else:
-                self._apply_hover_colors(widget)
-
-        def _on_leave(_event):
-            widget._is_hovered = False
-            if widget._hover_anim_enabled:
-                start_anim(0.0)
-            else:
-                self._apply_hover_colors(widget)
-
-        widget.bind("<Enter>", _on_enter, add="+")
-        widget.bind("<Leave>", _on_leave, add="+")
-        self._animated_widgets.append(widget)
-
-    def _apply_hover_colors(self, widget):
-        colors = getattr(widget, '_anim_colors', None)
-        if not colors:
-            return
-        color_start, color_end = colors
-        if widget._hover_anim_enabled:
-            widget.configure(fg_color=color_start, hover_color=color_start)
-        else:
-            if getattr(widget, '_is_hovered', False):
-                widget.configure(fg_color=color_end, hover_color=color_end)
-            else:
-                widget.configure(fg_color=color_start, hover_color=color_end)
-
     def _set_hover_animation_enabled(self, enabled):
-        for widget in self._animated_widgets:
-            colors = getattr(widget, '_anim_colors', None)
-            if not colors:
-                continue
-            widget._hover_anim_enabled = enabled
-            widget._anim_target = 0.0
-            widget._anim_current = 0.0
-            widget._anim_running = False
-            self._apply_hover_colors(widget)
+        self.hover_animator.set_enabled(enabled)
 
     def _refresh_animation_toggle_state(self):
         if not hasattr(self, 'anim_switch'):
@@ -643,7 +409,7 @@ class EhrenfestApp:
                 self.anim_var.set(False)
             self.balls_panel.set_animation_enabled(False)
             if was_on:
-                self._resume_after_cancelled_animation()
+                self.controller.handle_animation_cancelled()
             return
         else:
             try:
@@ -655,25 +421,10 @@ class EhrenfestApp:
     def _on_animation_toggle(self):
         self.balls_panel.set_animation_enabled(bool(self.anim_var.get()))
         if not self.anim_var.get():
-            self._resume_after_cancelled_animation()
+            self.controller.handle_animation_cancelled()
 
     def _on_ball_animation_complete(self):
-        self._waiting_for_animation = False
-        
-        if self._pending_panel_update is not None:
-            data = self._pending_panel_update
-            self._pending_panel_update = None
-            self.state_diagram.update(data['X'], data['N'], probs=data['probs'])
-            self.plot_panel.update(data['history'], data['N'])
-            self.canvas.draw_idle()
-        
-        if self.running:
-            self.root.after(self.speed_ms, self._run_step)
-
-    def _resume_after_cancelled_animation(self):
-        if self._waiting_for_animation and self.running:
-            self._waiting_for_animation = False
-            self.root.after(self.speed_ms, self._run_step)
+        self.controller.on_animation_complete()
 
     def _show_advanced_controls(self):
         """Pack and show the N controls and speed slider."""
@@ -717,27 +468,25 @@ class EhrenfestApp:
 
     def toggle_language(self):
         """Toggle application language between English and Croatian."""
-        new_lang = 'hr' if self.language == 'en' else 'en'
-        self._set_language(new_lang)
+        self.translator.toggle_language()
+        self.language = self.translator.language
+        self._apply_language()
 
     def start(self):
-        if not self.running:
-            self.running = True
+        if not self.controller.is_running:
             self._set_hover_animation_enabled(False)
-            self._waiting_for_animation = False
             self._set_info_message()
-            self._run_step()
+            self.controller.start()
 
     def pause(self):
-        if self.running:
-            self.running = False
+        if self.controller.is_running:
+            self.controller.pause()
             self._set_hover_animation_enabled(True)
-            self._waiting_for_animation = False
             self._set_info_message('paused_info')
 
     def reset(self):
         self.balls_panel.cancel_animation()
-        self._resume_after_cancelled_animation()
+        self.controller.handle_animation_cancelled()
         val = self._read_and_clamp_n()
         
         if val is None:
@@ -780,7 +529,7 @@ class EhrenfestApp:
 
     def on_n_change(self):
         self.balls_panel.cancel_animation()
-        self._resume_after_cancelled_animation()
+        self.controller.handle_animation_cancelled()
         val = self._read_and_clamp_n()
         if val is None:
             return
@@ -819,43 +568,7 @@ class EhrenfestApp:
             self.speed_ms = int(float(self.speed_slider.get()))
         except Exception:
             return
-
-    def _run_step(self):
-        """Performs one simulation step and schedules the next if running"""
-        if not self.running:
-            # Simulation paused
-            return
-
-        X, probs = self.model.step()
-        
-        animation_active = self.balls_panel.update(X, self.model.N)
-        
-        # Lazy panel updates: defer StateDiagram and PlotPanel during animation
-        if animation_active:
-            # Store pending update data
-            self._pending_panel_update = {
-                'X': X,
-                'N': self.model.N,
-                'probs': probs,
-                'history': self.model.getHistory().copy(),
-                'iteration': self.model.iteration,
-            }
-            self._waiting_for_animation = True
-        else:
-            # No animation - update panels
-            self.state_diagram.update(X, self.model.N, probs=probs)
-            self.plot_panel.update(self.model.getHistory(), self.model.N)
-            self._waiting_for_animation = False
-            self.root.after(self.speed_ms, self._run_step)
-        
-        self._update_status_label()
-        self.canvas.draw_idle()
-
-    def _set_language(self, lang):
-        if lang == self.language or lang not in ('en', 'hr'):
-            return
-        self.language = lang
-        self._apply_language()
+        self.controller.set_speed(self.speed_ms)
 
     def _apply_language(self):
         try:
@@ -915,76 +628,12 @@ class EhrenfestApp:
                 'current_label': self._t('plot_current_label'),
             })
 
-    def _create_grain_image(self, size):
-        try:
-            rng = np.random.RandomState(0)
-            noise = rng.normal(loc=0.0, scale=1.0, size=size)
-            noise = (noise - noise.min()) / (noise.max() - noise.min())
-            noise = 0.9 + 0.06 * (noise - 0.5)
-            array = (noise * 255).astype(np.uint8)
-            return Image.fromarray(array, mode='L').convert('RGB')
-        except Exception:
-            return None
-
-    def _setup_anim_ctrl_background(self, frame):
-        if self._grain_base_image is None:
-            return
-        self._anim_ctrl_bg_label = ctk.CTkLabel(frame, text="", image=None, fg_color='transparent')
-        self._anim_ctrl_bg_label.place(relwidth=1, relheight=1)
-        self._anim_ctrl_bg_label.lower()
-        frame.bind("<Configure>", self._on_anim_ctrl_resize)
-
-    def _on_anim_ctrl_resize(self, event):
-        if self._grain_base_image is None or self._anim_ctrl_bg_label is None:
-            return
-        width = max(getattr(event, 'width', self._anim_ctrl_bg_label.winfo_width()), 1)
-        height = max(getattr(event, 'height', self._anim_ctrl_bg_label.winfo_height()), 1)
-        self._update_anim_ctrl_background(width, height)
-
-    def _update_anim_ctrl_background(self, width, height):
-        if self._grain_base_image is None or self._anim_ctrl_bg_label is None:
-            return
-        try:
-            resized = self._grain_base_image.resize((width, height), Image.LANCZOS)
-        except Exception:
-            resized = self._grain_base_image.resize((width, height))
-        self._anim_ctrl_bg_image = ctk.CTkImage(light_image=resized, dark_image=resized, size=(width, height))
-        self._anim_ctrl_bg_label.configure(image=self._anim_ctrl_bg_image)
-        self._anim_ctrl_bg_label.image = self._anim_ctrl_bg_image
-
-    def _resource_path(self, relative_path):
-        base_dir = os.path.dirname(__file__)
-        return os.path.join(base_dir, relative_path)
-
-    def _load_translate_icon(self):
-        try:
-            icon_path = self._resource_path(os.path.join('assets', 'translate.png'))
-            if not os.path.exists(icon_path):
-                return None
-            target_size = (24, 24)
-            image = Image.open(icon_path).convert('RGBA')
-            if image.size != target_size:
-                try:
-                    image = image.resize(target_size, Image.LANCZOS)
-                except Exception:
-                    image = image.resize(target_size)
-
-            return ctk.CTkImage(
-                light_image=image,
-                dark_image=image,
-                size=target_size,
-            )
-        except Exception:
-            return None
+    def _apply_panel_updates(self, data):
+        self.state_diagram.update(data['X'], data['N'], probs=data['probs'])
+        self.plot_panel.update(data['history'], data['N'])
 
     def _t(self, key, **kwargs):
-        template = LANGUAGE_TEXT.get(key, {}).get(self.language)
-        if template is None:
-            template = LANGUAGE_TEXT.get(key, {}).get('en', '')
-        try:
-            return template.format(**kwargs)
-        except Exception:
-            return template
+        return self.translator.translate(key, **kwargs)
 
     def _set_info_message(self, key=None, **kwargs):
         if not hasattr(self, 'info_label'):
@@ -1024,12 +673,11 @@ class EhrenfestApp:
 
     def on_timelapse(self):
         """Starts a "timelapsed" run in a background thread, collecting history and then plotting it."""
-        if self.running:
+        if self.controller.is_running:
             self.pause()
-        
+
         self.balls_panel.cancel_animation()
-        self._waiting_for_animation = False
-        self._pending_panel_update = None
+        self.controller.clear_pending_updates()
         
         try:
             M = int(self.timelapse_iters_var.get())
@@ -1068,8 +716,7 @@ class EhrenfestApp:
                 start_X = getattr(self.model, 'X', 0)
             N = self.model.N
             
-            from .ehrenfestModel import EhrenfestModel as _Model  
-            m = _Model(N=N, initial=start_X)
+            m = EhrenfestModel(N=N, initial=start_X)
             
             hist = m.getHistory()
             for _ in range(M):
