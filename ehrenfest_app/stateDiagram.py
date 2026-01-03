@@ -14,13 +14,18 @@ class StateDiagram:
         self._xs = [0.2, 0.5, 0.8]
         self._y = 0.62
         self._arrow_pad = 0.08
+        self.texts = {
+            'title': 'State Diagram / Markov Chain',
+            'subtitle': ('Simplified 3-state view. We label the states using an integer\n'
+                         '$n \\in \\{0, ..., N\\}$ corresponding to the number of balls in Box A.'),
+        }
+        self.title_artist = None
+        self.subtitle = None
         self._setup_static_elements()
 
     def _setup_static_elements(self):
-        self.ax.set_title('State Diagram / Markov Chain')
-        subtitle = ('Simplified 3-state view. We label the states using an integer\n'
-                    r'$n \in \{0, ..., N\}$ corresponding to the number of balls in Box A.'
-        )
+        self.title_artist = self.ax.set_title(self.texts['title'])
+        subtitle = self.texts['subtitle']
         try:
             self.subtitle = self.ax.text(
                 0.5, 0.955, subtitle,
@@ -157,3 +162,36 @@ class StateDiagram:
     def _format_prob(self, value):
         places = 3 if self.N >= 1000 else 2
         return f'{value:.{places}f}'
+
+    def set_texts(self, texts):
+        if not isinstance(texts, dict):
+            return
+        updated = False
+        for key in ('title', 'subtitle'):
+            if key in texts and isinstance(texts[key], str):
+                if self.texts.get(key) != texts[key]:
+                    self.texts[key] = texts[key]
+                    updated = True
+        if updated:
+            self._apply_texts()
+
+    def _apply_texts(self):
+        if self.title_artist is None:
+            self.title_artist = self.ax.set_title(self.texts['title'])
+        else:
+            self.title_artist.set_text(self.texts['title'])
+        if self.subtitle is not None:
+            self.subtitle.set_text(self.texts['subtitle'])
+        elif self.texts.get('subtitle'):
+            try:
+                self.subtitle = self.ax.text(
+                    0.5, 0.955, self.texts['subtitle'],
+                    ha='center', va='top', transform=self.ax.transAxes,
+                    fontsize=9, color=self.colors.get('text', 'black')
+                )
+            except Exception:
+                self.subtitle = None
+        try:
+            self.ax.figure.canvas.draw_idle()
+        except Exception:
+            pass

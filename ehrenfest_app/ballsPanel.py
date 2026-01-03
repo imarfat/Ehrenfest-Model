@@ -31,6 +31,16 @@ class BallsPanel:
         self.prev_X = None
         self.current_positions = {'A': [], 'B': []}
         self.point_size = 30
+        self.texts = {
+            'title': 'The Ehrenfest Model',
+            'subtitle': 'A stochastic simulation of balls moving between two boxes.',
+            'subsubtitle': r'$X_i$ ~ number of balls in Box A at iteration $i$',
+            'box_a': 'Box A',
+            'box_b': 'Box B',
+        }
+        self.title_artist = None
+        self.subtitle_artist = None
+        self.subsubtitle_artist = None
 
         # Animation state
         self.user_animation_enabled = False
@@ -77,6 +87,18 @@ class BallsPanel:
         self.anim_path = []
         self.anim_index = 0
         self.ax.figure.canvas.draw_idle()
+
+    def set_texts(self, texts):
+        if not isinstance(texts, dict):
+            return
+        updated = False
+        for key in ('title', 'subtitle', 'subsubtitle', 'box_a', 'box_b'):
+            if key in texts and isinstance(texts[key], str):
+                if self.texts.get(key) != texts[key]:
+                    self.texts[key] = texts[key]
+                    updated = True
+        if updated:
+            self._apply_texts()
 
     def _grid_dims(self, count, w, h):
         if count == 0:
@@ -127,18 +149,21 @@ class BallsPanel:
             self.anim_circle = None
             self.box_edges = {'A': {}, 'B': {}}
             self.box_labels = {'A': None, 'B': None}
-            self.ax.set_title('The Ehrenfest Model')
-            subtitle = r'A stochastic simulation of balls moving between two boxes.'
-            subsubtitle = r'$X_i$ ~ number of balls in Box A at iteration $i$'
+            self.title_artist = None
+            self.subtitle_artist = None
+            self.subsubtitle_artist = None
+            self.title_artist = self.ax.set_title(self.texts['title'])
+            subtitle = self.texts['subtitle']
+            subsubtitle = self.texts['subsubtitle']
             try:
-                self.ax.text(
+                self.subtitle_artist = self.ax.text(
                     0.5, 0.985, subtitle,
                     ha='center', va='top',
                     transform=self.ax.transAxes,
                     fontsize=9,
                     color='black'
                 )
-                self.ax.text(
+                self.subsubtitle_artist = self.ax.text(
                     0.5, 0.94, subsubtitle,
                     ha='center', va='top',
                     transform=self.ax.transAxes,
@@ -146,12 +171,13 @@ class BallsPanel:
                     color='#333333'
                 )
             except Exception:
-                pass
+                self.subtitle_artist = None
+                self.subsubtitle_artist = None
 
             self.ax.axis('off')
 
-            self._create_box_outline('A', left, bottom, box_w, box_h, 'Box A')
-            self._create_box_outline('B', mid + self.box_gap, bottom, box_w, box_h, 'Box B')
+            self._create_box_outline('A', left, bottom, box_w, box_h, self.texts['box_a'])
+            self._create_box_outline('B', mid + self.box_gap, bottom, box_w, box_h, self.texts['box_b'])
             self.ax.set_xlim(0, 1)
             self.ax.set_ylim(0, 1)
             self.boxes_drawn = True
@@ -234,6 +260,7 @@ class BallsPanel:
         self.box_edges[key] = lines
         label_text = self.ax.text(x0 + w / 2, y0 + h + 0.01, label, ha='center', va='bottom', fontsize=6, color='black')
         self.box_labels[key] = label_text
+        self._apply_texts()
 
     def _update_box_top_visibility(self):
         visible = not (self.animation_allowed)
@@ -248,6 +275,28 @@ class BallsPanel:
                 label.set_visible(True)
         
         self.ax.figure.canvas.draw_idle()
+
+    def _apply_texts(self):
+        if not self.ax:
+            return
+        if self.boxes_drawn:
+            if self.title_artist is None:
+                self.title_artist = self.ax.set_title(self.texts['title'])
+            else:
+                self.title_artist.set_text(self.texts['title'])
+            if self.subtitle_artist is not None:
+                self.subtitle_artist.set_text(self.texts['subtitle'])
+            if self.subsubtitle_artist is not None:
+                self.subsubtitle_artist.set_text(self.texts['subsubtitle'])
+            for key, label in self.box_labels.items():
+                if label is None:
+                    continue
+                text_key = 'box_a' if key == 'A' else 'box_b'
+                label.set_text(self.texts.get(text_key, label.get_text()))
+            try:
+                self.ax.figure.canvas.draw_idle()
+            except Exception:
+                pass
 
     def _update_box_labels_position(self):
         # Position labels above boxes when not animating, below when animating

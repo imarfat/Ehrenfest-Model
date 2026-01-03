@@ -10,9 +10,15 @@ class PlotPanel:
         self.N = N
         self.history = []
         self.mode = 'realtime'
-        self.ax.set_title(r'Real Time Trajectory of $X_i$', pad=12)
-        self.ax.set_xlabel('Iteration', labelpad=5)
-        self.ax.set_ylabel(r'$X_i$ (balls in A)')
+        self.texts = {
+            'title_realtime': r'Real Time Trajectory of $X_i$',
+            'title_condensed': r'Timelapsed Trajectory of $X_i$',
+            'x_label': 'Iteration',
+            'y_label': r'$X_i$ (balls in A)',
+            'mean_label': 'Mean (N/2 = {value:.1f})',
+            'trajectory_label': 'Trajectory',
+            'current_label': 'Current value',
+        }
         self.ax.grid(True, linestyle='--', alpha=0.4)
 
         self.mean_line = self.ax.axhline(
@@ -20,8 +26,8 @@ class PlotPanel:
             linestyle='--', linewidth=0.5,
             label=self._mean_label()
         )
-        (self.history_line,) = self.ax.plot([], [], '-b', lw=1, label='Trajectory')
-        (self.last_point,) = self.ax.plot([], [], 'o', color='#fb923c', label='Current value')
+        (self.history_line,) = self.ax.plot([], [], '-b', lw=1, label=self.texts['trajectory_label'])
+        (self.last_point,) = self.ax.plot([], [], 'o', color='#fb923c', label=self.texts['current_label'])
 
         (self.condensed_line,) = self.ax.plot([], [], '-b', lw=1, visible=False)
         self.condensed_fill = PolyCollection([], facecolor='C0', alpha=0.18)
@@ -33,10 +39,15 @@ class PlotPanel:
         self.ax.yaxis.set_major_locator(MaxNLocator(integer=True))
         self.ax.xaxis.set_major_locator(MultipleLocator(1))
         self.ax.xaxis.set_major_formatter(FuncFormatter(self._format_tick_value))
-        self.legend = self.ax.legend(fontsize=7)
+        self.legend = None
+        self._apply_texts()
 
     def _mean_label(self):
-        return f'Mean (N/2 = {self.N/2:.1f})'
+        template = self.texts.get('mean_label', 'Mean (N/2 = {value:.1f})')
+        try:
+            return template.format(value=self.N / 2)
+        except Exception:
+            return template
 
     def _set_mode(self, mode):
         self.mode = mode
@@ -46,11 +57,10 @@ class PlotPanel:
         self.condensed_fill.set_visible(not is_realtime)
         
         if is_realtime:
-            self.ax.set_title(r'Real Time Trajectory of $X_i$', pad=12)
             self.ax.grid(True, linestyle='--', alpha=0.4)
         else:
-            self.ax.set_title(r'Timelapsed Trajectory of $X_i$', pad=12)
             self.ax.grid(True, linestyle='--', alpha=0.3)
+        self._apply_texts()
 
     def update(self, history, N=None):
         if N is not None:
@@ -94,12 +104,8 @@ class PlotPanel:
     def _update_mean_line(self):
         y = self.N / 2.0
         self.mean_line.set_ydata([y, y])
-        
-        if self.legend is not None:
-            for text in self.legend.texts:
-                if text.get_text().startswith('Mean'):
-                    text.set_text(self._mean_label())
-                    break
+        self.mean_line.set_label(self._mean_label())
+        self._refresh_legend()
 
     def show_condensed_time(self, history, N, target_points=800):
         self.N = int(N)
@@ -177,3 +183,42 @@ class PlotPanel:
             formatted = f"{value / 1_000:.1f}".rstrip('0').rstrip('.')
             return f"{formatted}K"
         return str(value)
+
+    def set_texts(self, texts):
+        if not isinstance(texts, dict):
+            return
+        updated = False
+        for key in (
+            'title_realtime',
+            'title_condensed',
+            'x_label',
+            'y_label',
+            'mean_label',
+            'trajectory_label',
+            'current_label',
+        ):
+            if key in texts and isinstance(texts[key], str):
+                if self.texts.get(key) != texts[key]:
+                    self.texts[key] = texts[key]
+                    updated = True
+        if updated:
+            self._apply_texts()
+
+    def _apply_texts(self):
+        title_key = 'title_realtime' if self.mode == 'realtime' else 'title_condensed'
+        self.ax.set_title(self.texts.get(title_key, ''), pad=12)
+        self.ax.set_xlabel(self.texts.get('x_label', ''), labelpad=5)
+        self.ax.set_ylabel(self.texts.get('y_label', ''))
+        if self.history_line is not None:
+            self.history_line.set_label(self.texts.get('trajectory_label', ''))
+        if self.last_point is not None:
+            self.last_point.set_label(self.texts.get('current_label', ''))
+        if self.mean_line is not None:
+            self.mean_line.set_label(self._mean_label())
+        self._refresh_legend()
+
+    def _refresh_legend(self):
+        handles = [h for h in (self.history_line, self.last_point, self.mean_line) if h is not None]
+        if not handles:
+            return
+        self.legend = self.ax.legend(handles=handles, fontsize=7)
