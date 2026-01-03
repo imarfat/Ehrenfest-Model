@@ -11,17 +11,30 @@ A desktop GUI application demonstrating the **Ehrenfest model of diffusion** usi
 
 Pictured below is the simulation window:
 
-<img width="610" height="370" alt="Ehrenfest GUI" src="https://github.com/user-attachments/assets/8553e6f4-ad88-432a-94e2-4c816162974e" />
+<img width="610" height="370" alt="Ehrenfest GUI" src="https://github.com/user-attachments/assets/8ae4d277-2c84-480b-b2cf-443966aafd8f" />
 
+## Download (Windows)
 
-## Requirements
+If you just want to run the app on Windows, download the latest prebuilt executable from the [releases](../../releases) page.
+
+Then:
+
+1. Download the `.exe` file from the latest release.
+2. Double‑click it to launch the simulation (no Python installation required).
+
+> **Heads up:** Your antivirus might freak out about an unsigned .exe which is normal for small open-source hobby projects.  
+> If you trust the source (hi, that’s me), you can tell it to relax and allow it.
+
+## Running from Source
+
+### Requirements
 
 - Python 3.8+
 - matplotlib
 - numpy
-- CustomTkinter
+- [CustomTkinter](https://github.com/TomSchimansky/CustomTkinter)
 
-## Installation
+### Installation
 
 Install dependencies using `pip`:
 
@@ -29,7 +42,7 @@ Install dependencies using `pip`:
 pip install -r requirements.txt
 ```
 
-## Run
+### Run
 
 Launch the simulation:
 
