@@ -21,7 +21,7 @@ class BallsPanel:
         self.boxes_drawn = False
         self.box_edges = {'A': {}, 'B': {}}
         self.box_labels = {'A': None, 'B': None}
-        self.base_box_top = 0.85
+        self.base_box_top = 0.84
         self.base_box_bottom = 0.05
         self.anim_box_top = 0.74
         self.anim_box_bottom = 0.16
@@ -149,7 +149,6 @@ class BallsPanel:
             self.anim_circle = None
             self.box_edges = {'A': {}, 'B': {}}
             self.box_labels = {'A': None, 'B': None}
-            self.title_artist = None
             self.subtitle_artist = None
             self.subsubtitle_artist = None
             self.title_artist = self.ax.set_title(self.texts['title'])

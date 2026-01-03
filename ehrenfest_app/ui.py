@@ -89,7 +89,7 @@ class EhrenfestApp:
             canvas_widget.configure(highlightthickness=0, bd=0)
         except Exception:
             pass
-        canvas_widget.pack(fill=tk.BOTH, expand=1)
+        canvas_widget.pack(fill=tk.BOTH, expand=1, pady=(10, 0))
 
         self.controller = SimulationController(
             scheduler=self.root,
@@ -528,12 +528,13 @@ class EhrenfestApp:
         return val
 
     def on_n_change(self):
+        val = self._read_and_clamp_n()
+        if val is None or val == self.model.N:
+            return
+
         self.balls_panel.cancel_animation()
         self.controller.handle_animation_cancelled()
-        val = self._read_and_clamp_n()
-        if val is None:
-            return
-        
+
         self.model.setN(val)
         self.model.iteration = 0
         
