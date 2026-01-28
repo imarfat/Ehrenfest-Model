@@ -440,11 +440,12 @@ class EhrenfestApp:
         
         # Create overlay frame covering the canvas area
         canvas_widget = self.canvas.get_tk_widget()
-        self._enlarged_overlay = tk.Frame(
+        self._enlarged_overlay = ctk.CTkFrame(
             self.root,
-            bg='#1a1a2e',
-            highlightthickness=2,
-            highlightbackground='#333'
+            fg_color='#1a1a2e',
+            corner_radius=12,
+            border_width=2,
+            border_color='#333'
         )
         self._enlarged_overlay.place(
             in_=canvas_widget,
@@ -460,17 +461,24 @@ class EhrenfestApp:
         # Copy the current plot state to the enlarged view
         self._sync_enlarged_plot(self._enlarged_ax)
         
-        # Create canvas for enlarged figure
-        self._enlarged_canvas = FigureCanvasTkAgg(self._enlarged_fig, master=self._enlarged_overlay)
+        # Container frame with rounded corners for the graph
+        graph_container = ctk.CTkFrame(
+            self._enlarged_overlay,
+            fg_color='#f8f9fa',
+            corner_radius=12,
+        )
+        graph_container.pack(fill=tk.BOTH, expand=True, padx=12, pady=(12, 8))
+        
+        # Create canvas for enlarged figure inside the rounded container
+        self._enlarged_canvas = FigureCanvasTkAgg(self._enlarged_fig, master=graph_container)
         enlarged_widget = self._enlarged_canvas.get_tk_widget()
-        enlarged_widget.pack(fill=tk.BOTH, expand=True, padx=8, pady=8)
+        enlarged_widget.pack(fill=tk.BOTH, expand=True, padx=4, pady=4)
         
         # Close hint label (translatable)
-        self._enlarged_hint_label = tk.Label(
+        self._enlarged_hint_label = ctk.CTkLabel(
             self._enlarged_overlay,
             text=self._t('enlarged_hint'),
-            bg='#1a1a2e',
-            fg='#888888',
+            text_color='#888888',
             font=('Segoe UI', 9)
         )
         self._enlarged_hint_label.pack(pady=(0, 8))
@@ -716,6 +724,7 @@ class EhrenfestApp:
         self.plot_panel.update(self.model.getHistory(), self.model.N)
         
         self.canvas.draw_idle()
+        self._refresh_enlarged_overlay()
         
         self._update_status_label()
         self._refresh_animation_toggle_state()
