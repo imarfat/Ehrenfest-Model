@@ -131,6 +131,10 @@ LANGUAGE_TEXT = {
         'en': 'Previous runs',
         'hr': 'Prethodni pokusi',
     },
+    'enlarged_hint': {
+        'en': 'Click anywhere or press Esc to close',
+        'hr': 'Kliknite bilo gdje ili pritisnite Esc za zatvaranje',
+    },
 }
 
 class Translator:

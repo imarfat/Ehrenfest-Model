@@ -90,6 +90,16 @@ class EhrenfestApp:
         except Exception:
             pass
         canvas_widget.pack(fill=tk.BOTH, expand=1, pady=(10, 0))
+        
+        # Enlarged plot overlay state
+        self._enlarged_overlay = None
+        self._enlarged_fig = None
+        self._enlarged_canvas = None
+        self._enlarged_ax = None
+        self._enlarged_hint_label = None
+        
+        # Register click handler on main canvas for plot enlargement
+        self.canvas.mpl_connect('button_press_event', self._on_canvas_click)
 
         self.controller = SimulationController(
             scheduler=self.root,
@@ -368,6 +378,7 @@ class EhrenfestApp:
         self.root.bind('<R>', self._on_reset_key)
         self.root.bind('<Up>', self._on_up_key)
         self.root.bind('<Down>', self._on_down_key)
+        self.root.bind('<Escape>', self._on_escape_key)
     
     def _on_space_key(self, event=None):
         """Toggle start/pause on Space"""
@@ -409,7 +420,147 @@ class EhrenfestApp:
             self.adjust_n(1) 
         elif event.delta < 0:
             self.adjust_n(-1) 
-        return "break"         
+        return "break"
+    
+    def _on_escape_key(self, event=None):
+        """Close enlarged overlay on Escape"""
+        if self._enlarged_overlay is not None:
+            self._close_enlarged_overlay()
+            return 'break'
+    
+    def _on_canvas_click(self, event):
+        """Handle click on the main canvas to check if plot was clicked"""
+        if event.inaxes == self.ax_plot:
+            self._show_enlarged_overlay()
+    
+    def _show_enlarged_overlay(self):
+        """Show the enlarged plot overlay"""
+        if self._enlarged_overlay is not None:
+            return  # Already showing
+        
+        # Create overlay frame covering the canvas area
+        canvas_widget = self.canvas.get_tk_widget()
+        self._enlarged_overlay = tk.Frame(
+            self.root,
+            bg='#1a1a2e',
+            highlightthickness=2,
+            highlightbackground='#333'
+        )
+        self._enlarged_overlay.place(
+            in_=canvas_widget,
+            relx=0.02, rely=0.02,
+            relwidth=0.96, relheight=0.96
+        )
+        
+        # Create enlarged figure
+        self._enlarged_fig = plt.Figure(figsize=(12, 7), dpi=100, facecolor='#f8f9fa')
+        self._enlarged_ax = self._enlarged_fig.add_subplot(111)
+        self._enlarged_ax.set_facecolor('#ffffff')
+        
+        # Copy the current plot state to the enlarged view
+        self._sync_enlarged_plot(self._enlarged_ax)
+        
+        # Create canvas for enlarged figure
+        self._enlarged_canvas = FigureCanvasTkAgg(self._enlarged_fig, master=self._enlarged_overlay)
+        enlarged_widget = self._enlarged_canvas.get_tk_widget()
+        enlarged_widget.pack(fill=tk.BOTH, expand=True, padx=8, pady=8)
+        
+        # Close hint label (translatable)
+        self._enlarged_hint_label = tk.Label(
+            self._enlarged_overlay,
+            text=self._t('enlarged_hint'),
+            bg='#1a1a2e',
+            fg='#888888',
+            font=('Segoe UI', 9)
+        )
+        self._enlarged_hint_label.pack(pady=(0, 8))
+        
+        # Click on overlay to close
+        self._enlarged_canvas.mpl_connect('button_press_event', lambda e: self._close_enlarged_overlay())
+        
+        self._enlarged_canvas.draw()
+    
+    def _sync_enlarged_plot(self, ax):
+        """Sync the enlarged axes with the current plot panel state"""
+        pp = self.plot_panel
+        ax.grid(True, linestyle='--', alpha=0.4)
+        
+        # Copy superposed trajectories first (so they're in background)
+        for line, fill in pp._superposed_artists:
+            xs, ys = line.get_xdata(), line.get_ydata()
+            if len(xs) > 0:
+                ax.plot(xs, ys, '-', color='#94a3b8', lw=1, alpha=0.5, zorder=1)
+        
+        # Copy mean line
+        ax.axhline(pp.N / 2, color='r', alpha=0.8, linestyle='--', linewidth=0.8,
+                   label=pp._mean_label())
+        
+        # Copy data based on mode
+        if pp.mode == 'realtime':
+            xs, ys = pp.history_line.get_xdata(), pp.history_line.get_ydata()
+            if len(xs) > 0:
+                ax.plot(xs, ys, '-b', lw=1.2, label=pp.texts.get('trajectory_label', 'Trajectory'))
+                ax.plot([xs[-1]], [ys[-1]], 'o', color='#fb923c', markersize=8,
+                        label=pp.texts.get('current_label', 'Current value'))
+        else:  # condensed
+            xs, ys = pp.condensed_line.get_xdata(), pp.condensed_line.get_ydata()
+            if len(xs) > 0:
+                ax.plot(xs, ys, '-b', lw=1.2, label=pp.texts.get('trajectory_label', 'Trajectory'))
+                # Copy fill
+                paths = pp.condensed_fill.get_paths()
+                if paths:
+                    from matplotlib.collections import PolyCollection
+                    fill = PolyCollection([p.vertices for p in paths], facecolor='C0', alpha=0.18)
+                    ax.add_collection(fill)
+                last_x, last_y = pp.last_point.get_data()
+                if len(last_x) > 0:
+                    ax.plot(last_x, last_y, 'o', color='#fb923c', markersize=8,
+                            label=pp.texts.get('current_label', 'Current value'))
+        
+        # Set axes limits and labels
+        ax.set_xlim(pp.ax.get_xlim())
+        ax.set_ylim(pp.ax.get_ylim())
+        title_key = 'title_realtime' if pp.mode == 'realtime' else 'title_condensed'
+        ax.set_title(pp.texts.get(title_key, ''), pad=12, fontsize=14)
+        ax.set_xlabel(pp.texts.get('x_label', ''), labelpad=8, fontsize=11)
+        ax.set_ylabel(pp.texts.get('y_label', ''), fontsize=11)
+        ax.legend(fontsize=9, loc='upper right')
+    
+    def _close_enlarged_overlay(self):
+        """Close the enlarged plot overlay"""
+        if self._enlarged_overlay is None:
+            return
+        
+        try:
+            if self._enlarged_fig is not None:
+                plt.close(self._enlarged_fig)
+        except Exception:
+            pass
+        
+        try:
+            self._enlarged_overlay.destroy()
+        except Exception:
+            pass
+        
+        self._enlarged_overlay = None
+        self._enlarged_fig = None
+        self._enlarged_canvas = None
+        self._enlarged_ax = None
+        self._enlarged_hint_label = None
+    
+    def _refresh_enlarged_overlay(self):
+        """Refresh the enlarged overlay with current plot data"""
+        if self._enlarged_overlay is None or self._enlarged_ax is None:
+            return
+        
+        # Clear and redraw
+        self._enlarged_ax.clear()
+        self._sync_enlarged_plot(self._enlarged_ax)
+        
+        try:
+            self._enlarged_canvas.draw_idle()
+        except Exception:
+            pass
         
     def _set_hover_animation_enabled(self, enabled):
         self.hover_animator.set_enabled(enabled)
@@ -651,10 +802,19 @@ class EhrenfestApp:
                 'current_label': self._t('plot_current_label'),
                 'superposed_label': self._t('superposed_label'),
             })
+        
+        # Update enlarged overlay hint and content if visible
+        if self._enlarged_hint_label is not None:
+            try:
+                self._enlarged_hint_label.configure(text=self._t('enlarged_hint'))
+            except Exception:
+                pass
+        self._refresh_enlarged_overlay()
 
     def _apply_panel_updates(self, data):
         self.state_diagram.update(data['X'], data['N'], probs=data['probs'])
         self.plot_panel.update(data['history'], data['N'])
+        self._refresh_enlarged_overlay()
 
     def _t(self, key, **kwargs):
         return self.translator.translate(key, **kwargs)
@@ -753,6 +913,7 @@ class EhrenfestApp:
                     superpose = self.superpose_var.get()
                     self.plot_panel.show_condensed_time(hist, N, superpose=superpose)
                     self.canvas.draw_idle()
+                    self._refresh_enlarged_overlay()
                 finally:
                     # Re-enable buttons
                     try:
