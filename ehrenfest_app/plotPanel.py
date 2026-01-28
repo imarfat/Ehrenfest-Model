@@ -2,6 +2,9 @@ import math
 import numpy as np # type: ignore
 from matplotlib.collections import PolyCollection # type: ignore
 from matplotlib.ticker import FuncFormatter, MaxNLocator, MultipleLocator # type: ignore
+from matplotlib.lines import Line2D # type: ignore
+
+SUPERPOSED_COLOR = '#94a3b8'
 
 
 class PlotPanel:
@@ -18,8 +21,12 @@ class PlotPanel:
             'mean_label': 'Mean (N/2 = {value:.1f})',
             'trajectory_label': 'Trajectory',
             'current_label': 'Current value',
+            'superposed_label': 'Previous runs',
         }
         self.ax.grid(True, linestyle='--', alpha=0.4)
+
+        self._superposed_artists = []  
+        self._superposed_count = 0
 
         self.mean_line = self.ax.axhline(
             self.N / 2, color='r', alpha=0.8,
@@ -107,7 +114,16 @@ class PlotPanel:
         self.mean_line.set_label(self._mean_label())
         self._refresh_legend()
 
-    def show_condensed_time(self, history, N, target_points=800):
+    def show_condensed_time(self, history, N, target_points=800, superpose=False):
+        """Show a timelapsed/condensed trajectory.
+        
+        If superpose=True, the current condensed trajectory (if any) is saved
+        as a superposed background trajectory before rendering the new one.
+        """
+        # If superposing, save the current trajectory first
+        if superpose and self.mode == 'condensed':
+            self._save_current_as_superposed()
+        
         self.N = int(N)
         hist = np.asarray(history, dtype=float)
         L = len(hist)
@@ -120,6 +136,31 @@ class PlotPanel:
             self.last_point.set_data([], [])
             return
 
+        xs, means, mins, maxs = self._compute_condensed_data(hist, L, target_points)
+
+        self.condensed_line.set_data(xs, means)
+        verts = self._build_fill_between(xs, mins, maxs)
+        self.condensed_fill.set_verts([verts] if len(verts) else [])
+        
+        if xs.size > 0:
+            self.last_point.set_data([xs[-1]], [means[-1]])
+        else:
+            self.last_point.set_data([], [])
+        
+        # Compute xlim considering superposed trajectories
+        max_x = L
+        for line, fill in self._superposed_artists:
+            xdata = line.get_xdata()
+            if len(xdata) > 0:
+                max_x = max(max_x, xdata[-1] + 1)
+            
+        self.ax.set_xlim(0, max(1, max_x))
+        self._update_xticks(max(1, max_x))
+        self.ax.set_ylim(0, max(1, self.N))
+        self.ax.yaxis.set_major_locator(MaxNLocator(integer=True))
+
+    def _compute_condensed_data(self, hist, L, target_points):
+        """Compute xs, means, mins, maxs for condensed display."""
         if L <= target_points:
             xs = np.arange(L, dtype=float)
             means = hist
@@ -151,20 +192,46 @@ class PlotPanel:
             means = np.asarray(means)
             mins = np.asarray(mins)
             maxs = np.asarray(maxs)
+        return xs, means, mins, maxs
 
-        self.condensed_line.set_data(xs, means)
-        verts = self._build_fill_between(xs, mins, maxs)
-        self.condensed_fill.set_verts([verts] if len(verts) else [])
+    def _save_current_as_superposed(self):
+        """Save the current condensed trajectory as a superposed background."""
+        xs = self.condensed_line.get_xdata()
+        ys = self.condensed_line.get_ydata()
+        if len(xs) == 0:
+            return
         
-        if xs.size > 0:
-            self.last_point.set_data([xs[-1]], [means[-1]])
-        else:
-            self.last_point.set_data([], [])
-            
-        self.ax.set_xlim(0, max(1, L))
-        self._update_xticks(max(1, L))
-        self.ax.set_ylim(0, max(1, self.N))
-        self.ax.yaxis.set_major_locator(MaxNLocator(integer=True))
+        # Create new line for the superposed trajectory
+        line, = self.ax.plot(xs, ys, '-', color=SUPERPOSED_COLOR, lw=0.8, alpha=0.5, zorder=1)
+        
+        # Copy fill if available
+        verts = self.condensed_fill.get_paths()
+        fill = None
+        if verts:
+            fill = PolyCollection(
+                [path.vertices for path in verts],
+                facecolor=SUPERPOSED_COLOR,
+                alpha=0.08,
+                zorder=0
+            )
+            self.ax.add_collection(fill)
+        
+        self._superposed_artists.append((line, fill))
+
+    def clear_superposed(self):
+        """Remove all superposed trajectories."""
+        for line, fill in self._superposed_artists:
+            try:
+                line.remove()
+            except Exception:
+                pass
+            if fill is not None:
+                try:
+                    fill.remove()
+                except Exception:
+                    pass
+        self._superposed_artists.clear()
+        self._superposed_count = 0
 
     def _build_fill_between(self, xs, mins, maxs):
         if xs.size == 0:
@@ -196,6 +263,7 @@ class PlotPanel:
             'mean_label',
             'trajectory_label',
             'current_label',
+            'superposed_label',
         ):
             if key in texts and isinstance(texts[key], str):
                 if self.texts.get(key) != texts[key]:
@@ -219,6 +287,18 @@ class PlotPanel:
 
     def _refresh_legend(self):
         handles = [h for h in (self.history_line, self.last_point, self.mean_line) if h is not None]
+        
+        # Add a representative entry for superposed trajectories if any exist
+        if self._superposed_artists:
+            superposed_handle = Line2D(
+                [0], [0], 
+                color='#9ca3af', 
+                lw=0.8, 
+                alpha=0.6,
+                label=self.texts.get('superposed_label', 'Previous runs')
+            )
+            handles.append(superposed_handle)
+        
         if not handles:
             return
         self.legend = self.ax.legend(handles=handles, fontsize=7)

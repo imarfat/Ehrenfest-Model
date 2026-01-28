@@ -123,6 +123,14 @@ LANGUAGE_TEXT = {
         'en': 'Current value',
         'hr': 'Trenutna vrijednost',
     },
+    'superpose_checkbox': {
+        'en': 'Superpose',
+        'hr': 'Superponiraj',
+    },
+    'superposed_label': {
+        'en': 'Previous runs',
+        'hr': 'Prethodni pokusi',
+    },
 }
 
 class Translator:

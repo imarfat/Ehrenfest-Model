@@ -331,6 +331,24 @@ class EhrenfestApp:
                                            width=80, height=28)
         self.timelapse_btn.pack(side=tk.LEFT, padx=4)
         self.hover_animator.apply(self.timelapse_btn, "#FFFFFF", "#A3A3A3")
+        
+        # Superpose checkbox
+        self.superpose_var = tk.BooleanVar(value=False)
+        self.superpose_check = ctk.CTkCheckBox(
+            timelapse_controls,
+            text=self._t('superpose_checkbox'),
+            variable=self.superpose_var,
+            font=("Segoe UI", 9),
+            width=80,
+            height=24,
+            checkbox_width=16,
+            checkbox_height=16,
+            corner_radius=4,
+            border_width=1,
+            fg_color="#1f4d7a",
+            hover_color="#2a6a9e",
+        )
+        self.superpose_check.pack(side=tk.LEFT, padx=(8, 4))
     
 
         # Initial draw
@@ -476,6 +494,7 @@ class EhrenfestApp:
         if not self.controller.is_running:
             self._set_hover_animation_enabled(False)
             self._set_info_message()
+            self.plot_panel.clear_superposed()
             self.controller.start()
 
     def pause(self):
@@ -497,6 +516,7 @@ class EhrenfestApp:
         self.model.reset(N=val)
         self.balls_panel.update(self.model.getState(), self.model.N)
         self.state_diagram.update(self.model.getState(), self.model.N, probs=self.model.getTransitionProbabilities())
+        self.plot_panel.clear_superposed()
         self.plot_panel.update(self.model.getHistory(), self.model.N)
         self.canvas.draw_idle()
         self._update_status_label()
@@ -541,6 +561,7 @@ class EhrenfestApp:
         # Refresh panels with the new N
         self.balls_panel.update(self.model.getState(), self.model.N)
         self.state_diagram.update(self.model.getState(), self.model.N, probs=self.model.getTransitionProbabilities())
+        self.plot_panel.clear_superposed()
         self.plot_panel.update(self.model.getHistory(), self.model.N)
         
         self.canvas.draw_idle()
@@ -587,6 +608,7 @@ class EhrenfestApp:
             (getattr(self, 'timelapse_label', None), 'timelapse_heading'),
             (getattr(self, 'iterations_label', None), 'iterations_label'),
             (getattr(self, 'timelapse_btn', None), 'timelapse_run'),
+            (getattr(self, 'superpose_check', None), 'superpose_checkbox'),
         ]
 
         for widget, key in widget_map:
@@ -627,6 +649,7 @@ class EhrenfestApp:
                 'mean_label': self._t('plot_mean_label'),
                 'trajectory_label': self._t('plot_trajectory_label'),
                 'current_label': self._t('plot_current_label'),
+                'superposed_label': self._t('superposed_label'),
             })
 
     def _apply_panel_updates(self, data):
@@ -727,7 +750,8 @@ class EhrenfestApp:
             # Schedule plotting back on main thread
             def finish():
                 try:
-                    self.plot_panel.show_condensed_time(hist, N)
+                    superpose = self.superpose_var.get()
+                    self.plot_panel.show_condensed_time(hist, N, superpose=superpose)
                     self.canvas.draw_idle()
                 finally:
                     # Re-enable buttons
