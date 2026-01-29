@@ -29,14 +29,14 @@ class EhrenfestApp:
         self._info_message_key = None
         self._info_message_kwargs = {}
         self.root.title(self._t('title'))
-        self.model = EhrenfestModel(N=20)
+        self.model = EhrenfestModel(N=80)
         self.speed_ms = 500
         self.hover_animator = HoverAnimationManager()
         self._grain_base_image = create_grain_image((512, 512))
         self.grain_background = GrainBackground(self._grain_base_image)
         self._translate_icon = None
 
-        self.fig = plt.Figure(figsize=(10, 6), dpi=100)
+        self.fig = plt.Figure(figsize=(11, 7), dpi=100)
         
         # Subtle grainy background texture
         try:
@@ -324,6 +324,7 @@ class EhrenfestApp:
         self.iterations_label.pack(side=tk.LEFT, padx=(0, 4))
         
         self.timelapse_iters_var = tk.StringVar(value="1000")
+        self.last_timelapse_iters = 1000
         self.timelapse_entry = ctk.CTkEntry(
             timelapse_controls, 
             textvariable=self.timelapse_iters_var, 
@@ -332,6 +333,8 @@ class EhrenfestApp:
             corner_radius=6
         )
         self.timelapse_entry.pack(side=tk.LEFT, padx=4)
+        self.timelapse_entry.bind('<FocusOut>', lambda e: self._on_timelapse_iters_change())
+        self.timelapse_entry.bind('<Return>', lambda e: self._on_timelapse_iters_change())
         
         # Timelapse run button
         self.timelapse_btn = ctk.CTkButton(timelapse_controls, text=self._t('timelapse_run'), 
@@ -728,6 +731,24 @@ class EhrenfestApp:
         
         self._update_status_label()
         self._refresh_animation_toggle_state()
+    
+    def _on_timelapse_iters_change(self):
+        """Clear superposed trajectories when timelapse iterations change."""
+        try:
+            val = int(self.timelapse_iters_var.get())
+        except Exception:
+            return
+            
+        if not hasattr(self, 'last_timelapse_iters'):
+            self.last_timelapse_iters = 1000  # Default fallback
+            
+        if self.last_timelapse_iters != val:
+            self.last_timelapse_iters = val
+            self.plot_panel.clear_superposed()
+            # Clear current plot so it doesn't get superposed on the next run
+            self.plot_panel.update([], self.model.N)
+            self.canvas.draw_idle()
+            self._refresh_enlarged_overlay()
         
     def adjust_n(self, delta):
         try:
@@ -888,6 +909,12 @@ class EhrenfestApp:
             except Exception:
                 pass
             self._show_warning('too_many_iterations_title', 'too_many_iterations_message', max_iters=MAX_TIMELAPSE_ITERS)
+
+
+        if hasattr(self, 'last_timelapse_iters') and self.last_timelapse_iters != M:
+            self.plot_panel.clear_superposed()
+            self.plot_panel.update([], self.model.N)
+        self.last_timelapse_iters = M
 
         # Disable UI buttons while running
         self.timelapse_btn.configure(state=tk.DISABLED)
