@@ -382,6 +382,7 @@ class EhrenfestApp:
         self.root.bind('<Up>', self._on_up_key)
         self.root.bind('<Down>', self._on_down_key)
         self.root.bind('<Escape>', self._on_escape_key)
+        self.root.bind('<Control-c>', self._on_clear_graph)
     
     def _on_space_key(self, event=None):
         """Toggle start/pause on Space"""
@@ -430,6 +431,19 @@ class EhrenfestApp:
         if self._enlarged_overlay is not None:
             self._close_enlarged_overlay()
             return 'break'
+
+    def _on_clear_graph(self, event=None):
+        """Clear the graph (superposed trajectories) on Ctrl+C"""
+        # Allow normal copy operation if an entry has focus
+        if isinstance(self.root.focus_get(), (tk.Entry, ctk.CTkEntry)):
+            return
+        
+        self.plot_panel.clear_superposed()
+        # Also clear the current plot for a full clean slate visual
+        self.plot_panel.update([], self.model.N)
+        self.canvas.draw_idle()
+        self._refresh_enlarged_overlay()
+        return 'break'
     
     def _on_canvas_click(self, event):
         """Handle click on the main canvas to check if plot was clicked"""
