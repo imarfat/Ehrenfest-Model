@@ -3,7 +3,6 @@ from tkinter import messagebox
 import customtkinter as ctk  # type: ignore
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg  # type: ignore
 import matplotlib.pyplot as plt  # type: ignore
-import numpy as np  # type: ignore
 import os
 import threading
 
@@ -12,8 +11,9 @@ from .ballsPanel import BallsPanel
 from .stateDiagram import StateDiagram
 from .plotPanel import PlotPanel
 from .translator import Translator
-from .uiHelpers import GrainBackground, HoverAnimationManager, create_grain_image, load_translate_icon
+from .uiHelpers import HoverAnimationManager, load_translate_icon
 from .simulationController import SimulationController
+from .histogramPanel import draw_histogram
 
 # Maximum allowed number of balls (for UI & performance reasons)
 MAX_N = 10000
@@ -32,31 +32,14 @@ class EhrenfestApp:
         self.model = EhrenfestModel(N=80)
         self.speed_ms = 500
         self.hover_animator = HoverAnimationManager()
-        self._grain_base_image = create_grain_image((512, 512))
-        self.grain_background = GrainBackground(self._grain_base_image)
         self._translate_icon = None
 
-        self.fig = plt.Figure(figsize=(11, 7), dpi=100)
-        
-        # Subtle grainy background texture
         try:
-            rng = np.random.RandomState(0)
-            noise = rng.normal(loc=0.0, scale=1.0, size=(256, 256))
-            noise = (noise - noise.min()) / (noise.max() - noise.min())
-            noise = 0.9 + 0.06 * (noise - 0.5)
-            ax_bg = self.fig.add_axes([0, 0, 1, 1], zorder=0)
-            ax_bg.imshow(
-                noise, 
-                cmap='Greys', 
-                aspect='auto', 
-                interpolation='bilinear', 
-                extent=[0, 1, 0, 1], 
-                alpha=0.1
-            )
-            ax_bg.set_axis_off()
+            self.root.configure(fg_color="#FFFFFF")
         except Exception:
-            # Continue with plain background if error occurs
             pass
+
+        self.fig = plt.Figure(figsize=(11, 7), dpi=100, facecolor="#FFFFFF")
 
         # Main gridspec layout, 2 rows, 2 columns, left column wider
         gs = self.fig.add_gridspec(2, 2, width_ratios=[1.5, 1])
@@ -97,6 +80,15 @@ class EhrenfestApp:
         self._enlarged_canvas = None
         self._enlarged_ax = None
         self._enlarged_hint_label = None
+
+        # Histogram overlay state
+        self._hist_overlay = None
+        self._hist_fig = None
+        self._hist_canvas = None
+        self._hist_ax = None
+        self._hist_hint_label = None
+        self._last_timelapse_history = None
+        self._last_timelapse_N = None
         
         # Register click handler on main canvas for plot enlargement
         self.canvas.mpl_connect('button_press_event', self._on_canvas_click)
@@ -111,9 +103,8 @@ class EhrenfestApp:
             speed_ms=self.speed_ms,
         )
 
-        anim_ctrl = ctk.CTkFrame(root, fg_color='transparent', bg_color='transparent')
+        anim_ctrl = ctk.CTkFrame(root, fg_color="#FFFFFF", bg_color="#FFFFFF")
         anim_ctrl.pack(fill=tk.X, padx=10, pady=0)
-        self.grain_background.attach(anim_ctrl)
         self.anim_var = tk.BooleanVar(value=False)
         self.anim_switch = ctk.CTkSwitch(
             anim_ctrl,
@@ -155,7 +146,7 @@ class EhrenfestApp:
         self.translate_btn.pack(side=tk.RIGHT, padx=(4, 0), pady=6)
 
         # Controls frame
-        ctrl = ctk.CTkFrame(root, corner_radius=0)
+        ctrl = ctk.CTkFrame(root, corner_radius=0, fg_color="#FFFFFF", bg_color="#FFFFFF")
         ctrl.pack(side=tk.BOTTOM, fill=tk.X, expand=False, padx=0, pady=0)
         try:
             top_border = tk.Frame(ctrl, height=1, background="#000000", borderwidth=0, highlightthickness=0)
@@ -302,8 +293,14 @@ class EhrenfestApp:
         )
         self.status.pack(side=tk.RIGHT, padx=16, pady=8)
 
-        # Timelapse frame
-        timelapse_frame = ctk.CTkFrame(ctrl, corner_radius=8)
+        # Timelapse frame (subtle panel backdrop vs white control bar)
+        timelapse_frame = ctk.CTkFrame(
+            ctrl,
+            corner_radius=8,
+            fg_color="#eef1f6",
+            border_width=1,
+            border_color="#d8dee8",
+        )
         timelapse_frame.pack(side=tk.RIGHT, padx=16, pady=8)
         
         self.timelapse_label = ctk.CTkLabel(
@@ -362,7 +359,24 @@ class EhrenfestApp:
             hover_color="#2a6a9e",
         )
         self.superpose_check.pack(side=tk.LEFT, padx=(8, 4))
-    
+
+        # Histogram (compact; black text / outline like primary controls)
+        self.histogram_btn = ctk.CTkButton(
+            timelapse_controls,
+            text=self._t('histogram_button'),
+            text_color="black",
+            command=self.on_histogram,
+            fg_color="#FFFFFF",
+            hover_color="#e8e8e8",
+            border_width=1,
+            border_color="#000000",
+            corner_radius=4,
+            width=44,
+            height=18,
+            font=("Segoe UI", 9),
+        )
+        self.histogram_btn.pack(side=tk.LEFT, padx=(4, 2), pady=0)
+
 
         # Initial draw
         self.balls_panel.update(self.model.getState(), self.model.N)
@@ -427,7 +441,10 @@ class EhrenfestApp:
         return "break"
     
     def _on_escape_key(self, event=None):
-        """Close enlarged overlay on Escape"""
+        """Close any open overlay on Escape"""
+        if self._hist_overlay is not None:
+            self._close_histogram_overlay()
+            return 'break'
         if self._enlarged_overlay is not None:
             self._close_enlarged_overlay()
             return 'break'
@@ -587,6 +604,113 @@ class EhrenfestApp:
         except Exception:
             pass
         
+    def on_histogram(self):
+        """Toggle the histogram overlay for the most recent simulation data."""
+        if self._hist_overlay is not None:
+            self._close_histogram_overlay()
+            return
+
+        history, N = self._pick_histogram_source()
+        if history is None or len(history) < 2 or N <= 0:
+            self._show_warning('histogram_empty_title', 'histogram_empty_message')
+            return
+        self._show_histogram_overlay(history, N)
+
+    def _pick_histogram_source(self):
+        """Return (history, N) preferring the last timelapse run."""
+        if self._last_timelapse_history and self._last_timelapse_N:
+            return self._last_timelapse_history, self._last_timelapse_N
+        try:
+            return self.model.getHistory(), self.model.N
+        except Exception:
+            return None, 0
+
+    def _histogram_texts(self):
+        return {
+            'title': self._t('histogram_title'),
+            'x_label': self._t('histogram_x_label'),
+            'y_label': self._t('histogram_y_label'),
+            'empirical_label': self._t('histogram_empirical_label'),
+            'binomial_label': self._t('histogram_binomial_label'),
+        }
+
+    def _show_histogram_overlay(self, history, N):
+        canvas_widget = self.canvas.get_tk_widget()
+        self._hist_overlay = ctk.CTkFrame(
+            self.root,
+            fg_color='#1a1a2e',
+            corner_radius=12,
+            border_width=2,
+            border_color='#333',
+        )
+        self._hist_overlay.place(
+            in_=canvas_widget,
+            relx=0.02, rely=0.02,
+            relwidth=0.96, relheight=0.96,
+        )
+
+        self._hist_fig = plt.Figure(figsize=(12, 7), dpi=100, facecolor='#f8f9fa')
+        self._hist_ax = self._hist_fig.add_subplot(111)
+        self._hist_ax.set_facecolor('#ffffff')
+        draw_histogram(self._hist_ax, history, N, texts=self._histogram_texts())
+
+        graph_container = ctk.CTkFrame(
+            self._hist_overlay,
+            fg_color='#f8f9fa',
+            corner_radius=12,
+        )
+        graph_container.pack(fill=tk.BOTH, expand=True, padx=12, pady=(12, 8))
+
+        self._hist_canvas = FigureCanvasTkAgg(self._hist_fig, master=graph_container)
+        hist_widget = self._hist_canvas.get_tk_widget()
+        hist_widget.pack(fill=tk.BOTH, expand=True, padx=4, pady=4)
+
+        self._hist_hint_label = ctk.CTkLabel(
+            self._hist_overlay,
+            text=self._t('enlarged_hint'),
+            text_color='#888888',
+            font=('Segoe UI', 9),
+        )
+        self._hist_hint_label.pack(pady=(0, 8))
+
+        self._hist_canvas.mpl_connect(
+            'button_press_event',
+            lambda e: self._close_histogram_overlay(),
+        )
+        self._hist_canvas.draw()
+
+    def _close_histogram_overlay(self):
+        if self._hist_overlay is None:
+            return
+
+        try:
+            if self._hist_fig is not None:
+                plt.close(self._hist_fig)
+        except Exception:
+            pass
+        try:
+            self._hist_overlay.destroy()
+        except Exception:
+            pass
+
+        self._hist_overlay = None
+        self._hist_fig = None
+        self._hist_canvas = None
+        self._hist_ax = None
+        self._hist_hint_label = None
+
+    def _refresh_histogram_overlay(self):
+        if self._hist_overlay is None or self._hist_ax is None:
+            return
+        history, N = self._pick_histogram_source()
+        if history is None or N <= 0:
+            return
+        draw_histogram(self._hist_ax, history, N, texts=self._histogram_texts())
+        try:
+            self._hist_canvas.draw_idle()
+        except Exception:
+            pass
+
     def _set_hover_animation_enabled(self, enabled):
         self.hover_animator.set_enabled(enabled)
 
@@ -804,6 +928,7 @@ class EhrenfestApp:
             (getattr(self, 'iterations_label', None), 'iterations_label'),
             (getattr(self, 'timelapse_btn', None), 'timelapse_run'),
             (getattr(self, 'superpose_check', None), 'superpose_checkbox'),
+            (getattr(self, 'histogram_btn', None), 'histogram_button'),
         ]
 
         for widget, key in widget_map:
@@ -854,6 +979,14 @@ class EhrenfestApp:
             except Exception:
                 pass
         self._refresh_enlarged_overlay()
+
+        # Update histogram overlay hint and content if visible
+        if self._hist_hint_label is not None:
+            try:
+                self._hist_hint_label.configure(text=self._t('enlarged_hint'))
+            except Exception:
+                pass
+        self._refresh_histogram_overlay()
 
     def _apply_panel_updates(self, data):
         self.state_diagram.update(data['X'], data['N'], probs=data['probs'])
@@ -935,6 +1068,7 @@ class EhrenfestApp:
         self.start_btn.configure(state=tk.DISABLED)
         self.pause_btn.configure(state=tk.DISABLED)
         self.reset_btn.configure(state=tk.DISABLED)
+        self.histogram_btn.configure(state=tk.DISABLED)
 
         # Background thread
         def worker():
@@ -962,8 +1096,11 @@ class EhrenfestApp:
                 try:
                     superpose = self.superpose_var.get()
                     self.plot_panel.show_condensed_time(hist, N, superpose=superpose)
+                    self._last_timelapse_history = list(hist)
+                    self._last_timelapse_N = int(N)
                     self.canvas.draw_idle()
                     self._refresh_enlarged_overlay()
+                    self._refresh_histogram_overlay()
                 finally:
                     # Re-enable buttons
                     try:
@@ -971,6 +1108,7 @@ class EhrenfestApp:
                         self.start_btn.configure(state=tk.NORMAL)
                         self.pause_btn.configure(state=tk.NORMAL)
                         self.reset_btn.configure(state=tk.NORMAL)
+                        self.histogram_btn.configure(state=tk.NORMAL)
                     except Exception:
                         pass
             self.root.after(0, finish)

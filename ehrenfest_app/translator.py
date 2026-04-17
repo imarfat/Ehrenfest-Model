@@ -135,6 +135,38 @@ LANGUAGE_TEXT = {
         'en': 'Click anywhere or press Esc to close',
         'hr': 'Kliknite bilo gdje ili pritisnite Esc za zatvaranje',
     },
+    'histogram_button': {
+        'en': 'Hist.',
+        'hr': 'Hist.',
+    },
+    'histogram_title': {
+        'en': r'Empirical distribution of $X_i$ vs $\mathrm{Bin}(N,\, 1/2)$',
+        'hr': r'Empirijska razdioba $X_i$ u odnosu na $\mathrm{Bin}(N,\, 1/2)$',
+    },
+    'histogram_x_label': {
+        'en': 'State n (balls in A)',
+        'hr': 'Stanje n (kuglice u A)',
+    },
+    'histogram_y_label': {
+        'en': 'Relative frequency',
+        'hr': 'Relativna frekvencija',
+    },
+    'histogram_empirical_label': {
+        'en': 'Simulation (L = {L:,})',
+        'hr': 'Simulacija (L = {L:,})',
+    },
+    'histogram_binomial_label': {
+        'en': r'Theoretical $\mathrm{Bin}(N,\, 1/2)$',
+        'hr': r'Teorijska $\mathrm{Bin}(N,\, 1/2)$',
+    },
+    'histogram_empty_title': {
+        'en': 'No data',
+        'hr': 'Nema podataka',
+    },
+    'histogram_empty_message': {
+        'en': 'Run a simulation or a timelapse first to display the histogram.',
+        'hr': 'Prvo pokrenite simulaciju ili ubrzani prikaz kako biste prikazali histogram.',
+    },
 }
 
 class Translator:
