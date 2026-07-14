@@ -41,11 +41,11 @@ def print_simulation_statistics(N, M, initial=None, rng=None):
 
     _configure_stdout_utf8()
     print(f"N = {N}, M = {M}")
-    print(f"X_bar (prosjek povijesti stanja) = {x_bar:.6f}")
-    print(f"sigma_hat (standardna devijacija povijesti stanja) = {sigma_hat:.6f}")
-    print(f"sigma_hat/X_bar (empirijska relativna standardna devijacija) = {empirical_rel_std:.6f}")
-    print(f"1/sqrt(N) (teorijska relativna standardna devijacija) = {theoretical_rel_std:.6f}")
-    print(f"Relativna razlika = {rel_diff_pct:.2f}%")
+    print(f"X_bar (mean of state history) = {x_bar:.6f}")
+    print(f"sigma_hat (standard deviation of state history) = {sigma_hat:.6f}")
+    print(f"sigma_hat/X_bar (empirical relative standard deviation) = {empirical_rel_std:.6f}")
+    print(f"1/sqrt(N) (theoretical relative standard deviation) = {theoretical_rel_std:.6f}")
+    print(f"Relative difference = {rel_diff_pct:.2f}%")
 
     return {
         "N": N,

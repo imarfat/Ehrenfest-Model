@@ -9,7 +9,7 @@ def create_grain_image(size, seed=0):
         rng = np.random.RandomState(seed)
         noise = rng.normal(loc=0.0, scale=1.0, size=size)
         noise = (noise - noise.min()) / (noise.max() - noise.min())
-        noise = 0.9 + 0.06 * (noise - 0.5)
+        noise = 0.98 + 0.012 * (noise - 0.5)
         array = (noise * 255).astype(np.uint8)
         return Image.fromarray(array, mode='L').convert('RGB')
     except Exception:

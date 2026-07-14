@@ -5,6 +5,29 @@ import sys
 from ehrenfest_app.ehrenfestModel import print_simulation_statistics
 
 
+def print_startup_instructions():
+    if hasattr(sys.stdout, "reconfigure"):
+        try:
+            sys.stdout.reconfigure(encoding="utf-8")
+        except Exception:
+            pass
+
+    print("Ehrenfest Model")
+    print("=" * 15)
+    print("Launching the graphical interface.")
+    print()
+    print("Basic controls:")
+    print("  Start / Pause / Reset  - run, pause, and reset the simulation")
+    print("  Animate              - animate ball transfers between containers")
+    print("  Timelapse            - fast simulation for a large number of iterations")
+    print("  Hist.                - histogram of the empirical state distribution")
+    print("  N                    - change the number of balls")
+    print()
+    print("Statistics from the terminal (without GUI):")
+    print("  python main.py stats N M [--initial X0] [--seed s]")
+    print()
+
+
 def run_gui():
     from ehrenfest_app.ui import EhrenfestApp
     import customtkinter as ctk
@@ -61,6 +84,7 @@ def main():
 
     args = parser.parse_args()
     if args.command is None:
+        print_startup_instructions()
         run_gui()
     else:
         args.func(args)

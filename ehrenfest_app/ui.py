@@ -3,6 +3,7 @@ from tkinter import messagebox
 import customtkinter as ctk  # type: ignore
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg  # type: ignore
 import matplotlib.pyplot as plt  # type: ignore
+import numpy as np  # type: ignore
 import os
 import threading
 
@@ -34,12 +35,25 @@ class EhrenfestApp:
         self.hover_animator = HoverAnimationManager()
         self._translate_icon = None
 
+        self.fig = plt.Figure(figsize=(11, 7), dpi=100)
+
         try:
-            self.root.configure(fg_color="#FFFFFF")
+            rng = np.random.RandomState(0)
+            noise = rng.normal(loc=0.0, scale=1.0, size=(256, 256))
+            noise = (noise - noise.min()) / (noise.max() - noise.min())
+            noise = 0.98 + 0.012 * (noise - 0.5)
+            ax_bg = self.fig.add_axes([0, 0, 1, 1], zorder=0)
+            ax_bg.imshow(
+                noise,
+                cmap='Greys',
+                aspect='auto',
+                interpolation='bilinear',
+                extent=[0, 1, 0, 1],
+                alpha=0.04
+            )
+            ax_bg.set_axis_off()
         except Exception:
             pass
-
-        self.fig = plt.Figure(figsize=(11, 7), dpi=100, facecolor="#FFFFFF")
 
         # Main gridspec layout, 2 rows, 2 columns, left column wider
         gs = self.fig.add_gridspec(2, 2, width_ratios=[1.5, 1])
@@ -146,7 +160,7 @@ class EhrenfestApp:
         self.translate_btn.pack(side=tk.RIGHT, padx=(4, 0), pady=6)
 
         # Controls frame
-        ctrl = ctk.CTkFrame(root, corner_radius=0, fg_color="#FFFFFF", bg_color="#FFFFFF")
+        ctrl = ctk.CTkFrame(root, corner_radius=0)
         ctrl.pack(side=tk.BOTTOM, fill=tk.X, expand=False, padx=0, pady=0)
         try:
             top_border = tk.Frame(ctrl, height=1, background="#000000", borderwidth=0, highlightthickness=0)
@@ -294,13 +308,7 @@ class EhrenfestApp:
         self.status.pack(side=tk.RIGHT, padx=16, pady=8)
 
         # Timelapse frame (subtle panel backdrop vs white control bar)
-        timelapse_frame = ctk.CTkFrame(
-            ctrl,
-            corner_radius=8,
-            fg_color="#eef1f6",
-            border_width=1,
-            border_color="#d8dee8",
-        )
+        timelapse_frame = ctk.CTkFrame(ctrl, corner_radius=8)
         timelapse_frame.pack(side=tk.RIGHT, padx=16, pady=8)
         
         self.timelapse_label = ctk.CTkLabel(
