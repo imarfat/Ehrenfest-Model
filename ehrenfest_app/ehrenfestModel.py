@@ -1,4 +1,62 @@
+import math
 import random
+import statistics
+import sys
+
+
+def _configure_stdout_utf8():
+    if hasattr(sys.stdout, "reconfigure"):
+        try:
+            sys.stdout.reconfigure(encoding="utf-8")
+        except Exception:
+            pass
+
+
+def print_simulation_statistics(N, M, initial=None, rng=None):
+    """
+    Run an Ehrenfest simulation for M iterations with N balls and print
+    summary statistics comparing empirical and theoretical relative spread.
+    """
+    N = int(N)
+    M = int(M)
+    if N <= 0:
+        raise ValueError("N must be a positive integer.")
+    if M < 0:
+        raise ValueError("M must be a non-negative integer.")
+
+    model = EhrenfestModel(N=N, initial=initial, rng=rng)
+    for _ in range(M):
+        model.step()
+
+    history = model.getHistory()
+    x_bar = statistics.mean(history)
+    sigma_hat = statistics.stdev(history) if len(history) > 1 else 0.0
+    empirical_rel_std = sigma_hat / x_bar if x_bar != 0 else float("nan")
+    theoretical_rel_std = 1 / math.sqrt(N)
+
+    if theoretical_rel_std != 0 and not math.isnan(empirical_rel_std):
+        rel_diff_pct = abs(empirical_rel_std - theoretical_rel_std) / theoretical_rel_std * 100
+    else:
+        rel_diff_pct = float("nan")
+
+    _configure_stdout_utf8()
+    print(f"N = {N}, M = {M}")
+    print(f"X_bar (prosjek povijesti stanja) = {x_bar:.6f}")
+    print(f"sigma_hat (standardna devijacija povijesti stanja) = {sigma_hat:.6f}")
+    print(f"sigma_hat/X_bar (empirijska relativna standardna devijacija) = {empirical_rel_std:.6f}")
+    print(f"1/sqrt(N) (teorijska relativna standardna devijacija) = {theoretical_rel_std:.6f}")
+    print(f"Relativna razlika = {rel_diff_pct:.2f}%")
+
+    return {
+        "N": N,
+        "M": M,
+        "x_bar": x_bar,
+        "sigma_hat": sigma_hat,
+        "empirical_rel_std": empirical_rel_std,
+        "theoretical_rel_std": theoretical_rel_std,
+        "relative_difference_pct": rel_diff_pct,
+        "history": history,
+    }
 
 
 class EhrenfestModel:
